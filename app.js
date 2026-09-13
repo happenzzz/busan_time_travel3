@@ -120,12 +120,12 @@ label('부산교육대학교',605,468,23,'now');
 poly(old,water,[[-260,-220],[-110,-240],[25,-184],[110,-75],[76,58],[161,140],[142,215],[46,247],[-83,215],[-110,92],[-177,4],[-227,-90]],.15);
 
 for(let j=0;j<8;j++)for(let i=0;i<5;i++){let x=-445+i*55,z=-350+j*69;if(x>-235&&z<240)continue;box(old,soil,x,.26,z,51,.5,64);box(old,rnd()<.5?paddy:water,x,.53,z,47,.12,59);for(let r=0;r<11;r++)box(old,paddy,x-21+r*4.1,.66,z,1,.3,57)}
-for(let j=0;j<6;j++)for(let i=0;i<4;i++){let x=275+i*47,z=-250+j*61;box(old,soil,x,.25,z,44,.5,57);box(old,paddy,x,.55,z,41,.16,54);for(let r=0;r<9;r++)box(old,reed,x-18+r*4.4,.8,z,.5,.4,53)}
+for(let j=0;j<6;j++)for(let i=0;i<4;i++){let x=275+i*47,z=-250+j*61;const wp=mapPoint(...mapAnchors.well);if(Math.hypot(x-wp[0],z-wp[2])<55)continue;box(old,soil,x,.25,z,44,.5,57);box(old,paddy,x,.55,z,41,.16,54);for(let r=0;r<9;r++)box(old,reed,x-18+r*4.4,.8,z,.5,.4,53)}
 for(let i=0;i<35;i++){let z=-390+i*23,x=-270+Math.sin(i*.14)*42;segment(old,soil,[x,z],[ -270+Math.sin((i+1)*.14)*42,z+23],4.5,.17)}
 function hut(x,z,w,d){box(old,mud,x,2,z,w,4,d);box(old,wood,x,1.5,z+d/2+.03,1.5,3,.1);box(old,dark,x-w*.3,2.1,z+d/2+.06,1.1,1.2,.1); // Sloped thatch, rounded eaves and ridge.
 const a=Math.atan2(2.3,d/2)*180/Math.PI;const length=Math.hypot(d/2+1,2.3);function roofside(side){let p=[],n=[],uv=[],ix=[0,1,2,0,2,3];let pts=side>0?[[x-w/2-1,4,z+d/2+1],[x+w/2+1,4,z+d/2+1],[x+w/2+.4,6.3,z],[x-w/2-.4,6.3,z]]:[[x-w/2-.4,6.3,z],[x+w/2+.4,6.3,z],[x+w/2+1,4,z-d/2-1],[x-w/2-1,4,z-d/2-1]];for(let k=0;k<4;k++){p.push(...pts[k]);n.push(0,.8,side*.5);uv.push(...[[0,0],[2,0],[2,1],[0,1]][k])}geom(old,thatch,p,n,uv,ix)}roofside(1);roofside(-1);ellipsoid(old,thatch,x,6.1,z,w*.57,.65,.8,10,4);for(let s of [-1,1])box(old,wood,x+s*(w/2-.25),2,z+d/2,.22,4,.22);box(old,soil,x,.1,z+d, w+6,.2,8)}
 for(let i=0;i<19;i++){let x=-350+rand(-70,50),z=170+i%7*25+rand(-8,8);hut(x,z,rand(9,13),rand(6,9));if(i%3===0)tree(old,x+12,z+4,.9)}
-for(let i=0;i<65;i++){let x=rand(-520,520),z=rand(-450,430);if(Math.abs(x)<210)continue;tree(old,x,z,rand(.6,1.4))}
+for(let i=0;i<65;i++){let x=rand(-520,520),z=rand(-450,430);if(Math.abs(x)<210)continue;const wp=mapPoint(...mapAnchors.well);if(Math.hypot(x-wp[0],z-wp[2])<40)continue;tree(old,x,z,rand(.6,1.4))}
 // Reed beds and fine stems along the marsh margin.
 for(let i=0;i<1400;i++){let a=rand(0,Math.PI*2),r=rand(1,1.15);let x=-60+Math.cos(a)*155*r,z=15+Math.sin(a)*211*r;let h=rand(.6,2.2);box(old,reed,x,h/2+.2,z,.1,h,.1);if(i%3===0)box(old,thatch,x,h+.13,z,.22,.35,.22)}
 // Water ripples: thin, softly coloured geometry on the surface.
@@ -291,6 +291,9 @@ const wellSign=frame(wellX,wellZ,0);sign(wellSign,'황새알 우물터',0,3.5,1.
 box(old,soil,wellX,.07,wellZ,9,.14,9);ring(old,wellX,wellZ,1.08,1.02,false);ellipsoid(old,dark,wellX,.17,wellZ,.95,.03,.95,24,4);ellipsoid(old,water,wellX,.19,wellZ,.88,.02,.88,24,4);
 for(let j=0;j<16;j++){let a=j/16*Math.PI*2;ellipsoid(old,wellStone,wellX+Math.cos(a)*1.08,1.05,wellZ+Math.sin(a)*1.08,.25,.12,.22,8,4)}
 for(let i=0;i<5;i++)ellipsoid(old,mud,wellX+2+i*.46,.43,wellZ-1.4,.21,.42,.22);for(let i=0;i<5;i++)tree(old,wellX-6+i*3,wellZ-7,rand(.45,.65));
+// Three old-era homes leave a clear common yard and approach to the well.
+const wellHuts=[{dx:-16,dz:-15,w:10,d:7},{dx:15,dz:-18,w:11,d:8},{dx:21,dz:9,w:9,d:7}];
+for(const h of wellHuts){const x=wellX+h.dx,z=wellZ+h.dz;box(old,soil,x,.08,z, h.w+5,.16,h.d+5);hut(x,z,h.w,h.d);const door=[x,z+h.d/2+1],bend=[wellX+h.dx*.42,wellZ+8];segment(old,soil,door,bend,1.6,.12);segment(old,soil,bend,[wellX+3,wellZ+3.7],1.6,.12);for(let j=0;j<2;j++)ellipsoid(old,mud,x-h.w/2-1,.38,z+j*.7,.27,.38,.27,10,5)}
 const drawingWater=makePerson('old',wellX+1.55,wellZ+.7,'우물에서 물을 긷는 사람',['여기는 대조리입니다. 마을 사람들이 이 우물에 물을 길으러 와요.','두레박을 내려 물을 담고, 줄을 잡아 천천히 끌어 올려요.','길어 온 물로 밥을 짓고 생활에 필요한 일을 해요.'],'water','draw',-70);
 makePerson('now',wellX+1.8,wellZ+2.8,'우물을 찾은 학생',['여기가 옛 우물이 있던 곳이에요. 돌로 둥글게 쌓은 우물이 보이나요?','학교 밖 우리 동네에도 옛날 사람들의 생활을 떠올릴 수 있는 장소가 있어요.'],'student','wave',5);
 const bucketRoot=new pc.Entity('wellBucket');old.addChild(bucketRoot);for(let xx of [-.18,.18])primitive(bucketRoot,'box',wood,xx,0,0,.05,.3,.4);for(let zz of [-.18,.18])primitive(bucketRoot,'box',wood,0,0,zz,.4,.3,.05);primitive(bucketRoot,'box',water,0,-.05,0,.32,.035,.32);const bucketRope=primitive(old,'cylinder',wood,wellX,1.1,wellZ,.026,1.6,.026);
@@ -577,7 +580,7 @@ for(let row=0;row<30;row++)for(let coln=0;coln<35;coln++){const x=-470+coln*34+(
 for(const b of buckets.values()){const mesh=new pc.Mesh(device);mesh.setPositions(b.p);mesh.setNormals(b.n);mesh.setUvs(0,b.u);mesh.setIndices(b.i);mesh.update(pc.PRIMITIVE_TRIANGLES);const ent=new pc.Entity(b.material.name);ent.addComponent('render',{meshInstances:[new pc.MeshInstance(mesh,b.material)],castShadows:!['water','ripple','grass','paddy','contactAO','pavers','concrete','soil','asphalt','lines'].includes(b.material.name),receiveShadows:true});b.parent.addChild(ent)}buckets.clear();
 let era='now',showLabels=true;let yaw=25,pitch=43,distance=285,target=new pc.Vec3(...school.point(0,0,32));let desired={yaw,pitch,distance,x:target.x,z:target.z};
 function toast(s){$('toast').textContent=s;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',2300)}
-function setEra(e){closeSpeech();era=e;now.enabled=e==='now';old.enabled=e==='old';$('past').classList.toggle('active',e==='old');$('present').classList.toggle('active',e==='now');$('past').setAttribute('aria-pressed',e==='old');$('present').setAttribute('aria-pressed',e==='now');$('eraTitle').textContent=e==='old'?'황새가 찾아오던 한새벌':'오늘날의 우리 동네';$('eraText').innerHTML=e==='old'?'논과 들, 물이 고인 습지와<br>초가가 모여 있는 옛날의 풍경':'학교와 대학, 집과 도로가<br>모여 있는 오늘날의 풍경'}
+function setEra(e){setTeleportArmed(false);closeSpeech();era=e;now.enabled=e==='now';old.enabled=e==='old';$('past').classList.toggle('active',e==='old');$('present').classList.toggle('active',e==='now');$('past').setAttribute('aria-pressed',e==='old');$('present').setAttribute('aria-pressed',e==='now');$('eraTitle').textContent=e==='old'?'황새가 찾아오던 한새벌':'오늘날의 우리 동네';$('eraText').innerHTML=e==='old'?'논과 들, 물이 고인 습지와<br>초가가 모여 있는 옛날의 풍경':'학교와 대학, 집과 도로가<br>모여 있는 오늘날의 풍경'}
 $('past').onclick=()=>setEra('old');$('present').onclick=()=>setEra('now');const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));function zoom(f){desired.distance=clamp(desired.distance*f,8,2700)}$('zoomIn').onclick=()=>zoom(.78);$('zoomOut').onclick=()=>zoom(1.28);$('home').onclick=()=>Object.assign(desired,{yaw:0,pitch:53,distance:990,x:0,z:65});$('school').onclick=()=>{Object.assign(desired,{x:school.point(0,0,46)[0],z:school.point(0,0,46)[2],distance:240,pitch:43,yaw:25});toast(era==='old'?'지금 우리 학교가 있는 자리입니다':'우리 학교를 가까이 살펴보세요')};$('top').onclick=()=>{desired.pitch=85;desired.yaw=0};$('names').onclick=()=>{showLabels=!showLabels;$('names').textContent=showLabels?'설명 숨김':'설명 보기';$('names').setAttribute('aria-pressed',showLabels)};$('full').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch(e){toast('전체 화면은 F11 키로도 볼 수 있습니다')}};
 let selectedPerson=null,meetingIndex={now:0,old:0};
 function closeSpeech(){selectedPerson=null;$('speech').hidden=true}
@@ -602,7 +605,7 @@ setTouchVisible(window.matchMedia('(pointer: coarse), (max-width: 1200px)').matc
 $('touchToggle').onclick=()=>setTouchVisible(!$('touchMove').classList.contains('shown'));
 for(const button of document.querySelectorAll('[data-move]')){const code=button.dataset.move;button.addEventListener('pointerdown',e=>{e.preventDefault();button.setPointerCapture(e.pointerId);touchKeys.add(code);button.classList.add('pressed')});const stop=()=>{touchKeys.delete(code);button.classList.remove('pressed')};for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,stop)}
 window.addEventListener('blur',()=>touchKeys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)touchKeys.clear()});
-$('well').onclick=()=>{closeSpeech();Object.assign(desired,{x:wellX,z:wellZ,distance:15,pitch:27,yaw:0})};
+$('well').onclick=()=>{closeSpeech();Object.assign(desired,{x:wellX,z:wellZ,distance:era==='old'?68:15,pitch:era==='old'?43:27,yaw:0})};
 $('dyke').onclick=()=>{closeSpeech();if(era!=='old')setEra('old');Object.assign(desired,{x:dykeX,z:dykeZ,distance:45,pitch:30,yaw:75})};
 
 const moveCodes=['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyQ','KeyE','ShiftLeft','ShiftRight'];
@@ -610,7 +613,46 @@ window.addEventListener('keydown',e=>{if(document.querySelector('dialog[open]')|
 window.addEventListener('keyup',e=>heldKeys.delete(e.code));window.addEventListener('blur',()=>heldKeys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)heldKeys.clear()});
 function keyboardMove(dt){if(document.querySelector('dialog[open]')){heldKeys.clear();touchKeys.clear();return}const down=(...keys)=>keys.some(k=>heldKeys.has(k)||touchKeys.has(k));let forward=Number(down('KeyW','ArrowUp'))-Number(down('KeyS','ArrowDown')),right=Number(down('KeyD','ArrowRight'))-Number(down('KeyA','ArrowLeft'));const len=Math.hypot(forward,right)||1;const speed=clamp(desired.distance*.22,8,150)*(down('ShiftLeft','ShiftRight')?2:1)*Math.min(dt,.05);let angle=desired.yaw*Math.PI/180;if(forward||right){desired.x=clamp(desired.x+(-Math.sin(angle)*forward+Math.cos(angle)*right)/len*speed,-1500,1500);desired.z=clamp(desired.z+(-Math.cos(angle)*forward-Math.sin(angle)*right)/len*speed,-1350,1450)}desired.yaw+=(Number(down('KeyQ'))-Number(down('KeyE')))*60*Math.min(dt,.05)}
 
-const screen=new pc.Vec3();let lastLabels=0;let animationTime=0;app.on('update',dt=>{keyboardMove(dt);animationTime+=dt;animatePeople(dt,animationTime);animateMagpies(animationTime);animateWell(animationTime);let f=1-Math.exp(-dt*10);yaw+=(desired.yaw-yaw)*f;pitch+=(desired.pitch-pitch)*f;distance+=(desired.distance-distance)*f;target.x+=(desired.x-target.x)*f;target.z+=(desired.z-target.z)*f;const a=yaw*Math.PI/180,b=pitch*Math.PI/180;camera.setPosition(target.x+distance*Math.cos(b)*Math.sin(a),distance*Math.sin(b),target.z+distance*Math.cos(b)*Math.cos(a));camera.lookAt(target);$('north').style.transform=`rotate(${-yaw}deg)`;lastLabels+=dt;if(lastLabels>.05){lastLabels=0;updatePeoplePins();const occupied=[];for(let l of [...labels].sort((a,b)=>a.pos.distance(target)-b.pos.distance(target))){camera.camera.worldToScreen(l.pos,screen);const width=Math.min(260,l.el.textContent.length*12+20);let visible=showLabels&&l.era===era&&screen.z>0&&screen.x>width/2+12&&screen.x<innerWidth-width/2-110&&screen.y>190&&screen.y<innerHeight-140&&!occupied.some(r=>Math.abs(r.x-screen.x)<(r.w+width)/2+6&&Math.abs(r.y-screen.y)<36);l.el.style.display=visible?'block':'none';if(visible){occupied.push({x:screen.x,y:screen.y,w:width});l.el.style.left=screen.x+'px';l.el.style.top=screen.y+'px'}}}});
+let teleportArmed=false;
+const teleportGesture=teleportSupport.createGesture(),teleportPointers=new Set();
+function setTeleportArmed(active){
+ teleportArmed=active;teleportGesture.reset();
+ for(const id of teleportPointers){if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}teleportPointers.clear();
+ document.body.classList.toggle('teleport-mode',active);$('teleport').setAttribute('aria-pressed',String(active));$('teleport').textContent=active?'이동 취소':'순간 이동';
+ if(active){for(const id of pointers.keys()){if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}pointers.clear();pinch=0;tapStart=null;heldKeys.clear();touchKeys.clear();closeSpeech();toast('이동할 바닥을 클릭하거나 터치하세요. Esc 키로 취소할 수 있어요.')}
+}
+function teleportToScreen(clientX,clientY){
+ const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return false;
+ const pixelX=(clientX-rect.left)*device.clientRect.width/rect.width,pixelY=(clientY-rect.top)*device.clientRect.height/rect.height;
+ const origin=camera.getPosition().clone(),rayPoint=camera.camera.screenToWorld(pixelX,pixelY,1,new pc.Vec3()),direction=rayPoint.sub(origin).normalize();
+ const hit=teleportSupport.pickGround(origin,direction,(x,z)=>Math.max(0,hillHeight(x,z)),camera.camera.farClip);
+ if(!hit){toast('이동할 수 있는 바닥을 선택해 주세요.');return false}
+ // Commit both the displayed and desired state, bypassing camera easing for this one action.
+ closeSpeech();heldKeys.clear();touchKeys.clear();desired.x=hit.x;desired.z=hit.z;desired.yaw=yaw;desired.pitch=pitch;desired.distance=distance;
+ target.x=hit.x;target.y=hit.y;target.z=hit.z;
+ const a=yaw*Math.PI/180,b=pitch*Math.PI/180;camera.setPosition(target.x+distance*Math.cos(b)*Math.sin(a),target.y+distance*Math.sin(b),target.z+distance*Math.cos(b)*Math.cos(a));camera.lookAt(target);
+ setTeleportArmed(false);toast('선택한 곳으로 이동했어요.');return true;
+}
+$('teleport').onclick=()=>setTeleportArmed(!teleportArmed);
+// Capture before ordinary rotation and person-click handlers; one tap produces one move.
+canvas.addEventListener('pointerdown',e=>{
+ if(!teleportArmed)return;e.preventDefault();e.stopImmediatePropagation();
+ if(e.button!==0){setTeleportArmed(false);return}
+ canvas.focus();teleportPointers.add(e.pointerId);teleportGesture.down(e.pointerId,e.clientX,e.clientY);canvas.setPointerCapture(e.pointerId);
+},{capture:true,passive:false});
+canvas.addEventListener('pointermove',e=>{if(!teleportArmed)return;e.preventDefault();e.stopImmediatePropagation();teleportGesture.move(e.pointerId,e.clientX,e.clientY);},{capture:true,passive:false});
+canvas.addEventListener('pointerup',e=>{
+ if(!teleportArmed)return;e.preventDefault();e.stopImmediatePropagation();
+ const valid=teleportGesture.up(e.pointerId,e.clientX,e.clientY);teleportPointers.delete(e.pointerId);
+ if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);
+ if(valid)teleportToScreen(e.clientX,e.clientY);
+},{capture:true,passive:false});
+for(const event of ['pointercancel','lostpointercapture'])canvas.addEventListener(event,e=>{if(!teleportArmed)return;teleportGesture.cancel(e.pointerId);teleportPointers.delete(e.pointerId);e.stopImmediatePropagation();},{capture:true});
+window.addEventListener('keydown',e=>{if(teleportArmed&&e.code==='Escape'){setTeleportArmed(false);e.preventDefault()}});
+window.addEventListener('blur',()=>setTeleportArmed(false));
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setTeleportArmed(false)});
+
+const screen=new pc.Vec3();let lastLabels=0;let animationTime=0;app.on('update',dt=>{keyboardMove(dt);animationTime+=dt;animatePeople(dt,animationTime);animateMagpies(animationTime);animateWell(animationTime);let f=1-Math.exp(-dt*10);yaw+=(desired.yaw-yaw)*f;pitch+=(desired.pitch-pitch)*f;distance+=(desired.distance-distance)*f;target.x+=(desired.x-target.x)*f;target.z+=(desired.z-target.z)*f;target.y+=(Math.max(0,hillHeight(target.x,target.z))-target.y)*f;const a=yaw*Math.PI/180,b=pitch*Math.PI/180;camera.setPosition(target.x+distance*Math.cos(b)*Math.sin(a),target.y+distance*Math.sin(b),target.z+distance*Math.cos(b)*Math.cos(a));camera.lookAt(target);$('north').style.transform=`rotate(${-yaw}deg)`;lastLabels+=dt;if(lastLabels>.05){lastLabels=0;updatePeoplePins();const occupied=[];for(let l of [...labels].sort((a,b)=>a.pos.distance(target)-b.pos.distance(target))){camera.camera.worldToScreen(l.pos,screen);const width=Math.min(260,l.el.textContent.length*12+20);let visible=showLabels&&l.era===era&&screen.z>0&&screen.x>width/2+12&&screen.x<innerWidth-width/2-110&&screen.y>190&&screen.y<innerHeight-140&&!occupied.some(r=>Math.abs(r.x-screen.x)<(r.w+width)/2+6&&Math.abs(r.y-screen.y)<36);l.el.style.display=visible?'block':'none';if(visible){occupied.push({x:screen.x,y:screen.y,w:width});l.el.style.left=screen.x+'px';l.el.style.top=screen.y+'px'}}}});
 // Useful fixed views make individual buildings inspectable on a touch screen.
 const buildingStops=[['학교 앞쪽',school,0,6,110,43],['벽화 쪽',gaenari,0,10,75,133],['파란 건물 쪽',parang,0,10,85,133],['학교 뒤쪽',kkachi,0,21,82,133],['옆 건물 쪽',songjuk,0,10,80,-47],['잔디 마당',school,0,39,160,25],['모래 마당',school,-2,74,110,43]];
 const visit=document.createElement('select');visit.id='buildingVisit';visit.setAttribute('aria-label','건물 가까이 보기');visit.innerHTML='<option value="">건물 가까이 보기</option>'+buildingStops.map((v,i)=>`<option value="${i}">${v[0]}</option>`).join('');document.querySelector('.meet').append(visit);visit.onchange=()=>{if(visit.value==='')return;closeSpeech();setEra('now');const [name,f,x,z,d,y]=buildingStops[Number(visit.value)],p=f.point(x,0,z);Object.assign(desired,{x:p[0],z:p[2],distance:d,pitch:25,yaw:y});visit.value='';toast(name+' 외관을 살펴보세요')};
@@ -622,5 +664,5 @@ const nearby=document.createElement('select');nearby.id='nearbyVisit';nearby.set
 cityButton.onclick=()=>{closeSpeech();Object.assign(desired,{x:180,z:220,distance:1300,pitch:58,yaw:43})};
 
 const campusVisit=document.createElement('select');campusVisit.id='campusVisit';campusVisit.setAttribute('aria-label','대학과 길 자세히 보기');campusVisit.innerHTML='<option value="">대학과 길 자세히 보기</option>'+Object.entries(detailStops).map(([key,p])=>`<option value="${key}">${p.name}</option>`).join('');document.querySelector('.meet').append(campusVisit);campusVisit.onchange=()=>{const stop=detailStops[campusVisit.value];if(!stop)return;closeSpeech();setEra('now');Object.assign(desired,stop);campusVisit.value='';toast(stop.name+'을 살펴보세요')};
-app.start();$('loading').classList.add('hidden');window.timeTravel={app,setEra,getState:()=>({era,device:device.deviceType,desired:{...desired},meshes:now.children.length+old.children.length,people:people.length,terrainShared:shared.enabled!==false,schoolLayout:{yard:yardSpec,kkachiFacing:schoolAngle+90,main:school.point(0,0,0),kkachi:kp,parang:bp,songjuk:sp,playground:school.point(0,0,43)},graphicsRevision:'map-aligned-campus-r4',mapAnchors,riverRoute,trainees:trainees.length,universityBuildings,detailStops,campusRoute,textOrientation:'bottom-up RGBA with outward-only faces',contextSites,characterStyle:'block',magpies:magpies.length,wellLocation:{x:wellX,z:wellZ},dykeLocation:{x:dykeX,z:dykeZ},textureUpload:'ImageBitmap'})};
+app.start();$('loading').classList.add('hidden');window.timeTravel={app,setEra,getState:()=>({era,device:device.deviceType,desired:{...desired},meshes:now.children.length+old.children.length,people:people.length,terrainShared:shared.enabled!==false,schoolLayout:{yard:yardSpec,kkachiFacing:schoolAngle+90,main:school.point(0,0,0),kkachi:kp,parang:bp,songjuk:sp,playground:school.point(0,0,43)},graphicsRevision:'well-homes-and-teleport-r5',teleportArmed,wellHuts,mapAnchors,riverRoute,trainees:trainees.length,universityBuildings,detailStops,campusRoute,textOrientation:'bottom-up RGBA with outward-only faces',contextSites,characterStyle:'block',magpies:magpies.length,wellLocation:{x:wellX,z:wellZ},dykeLocation:{x:dykeX,z:dykeZ},textureUpload:'ImageBitmap'})};
 }

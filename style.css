@@ -18,3 +18,8 @@ header h1{word-break:keep-all;font-size:clamp(16px,2.1vw,22px)}
 
 /* Only student-facing controls are shown. */
 #gpu{display:none}
+
+/* One-shot point-to-move selection works with mouse, pen and touch. */
+#teleport[aria-pressed="true"]{background:#155c4d;color:#fff;box-shadow:0 0 0 3px #86bca7}
+.teleport-mode #view{cursor:crosshair}
+.teleport-mode #labels,.teleport-mode #labels .personPin{pointer-events:none}
