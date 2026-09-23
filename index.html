@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>한새벌의 옛날과 오늘날</title><link rel="stylesheet" href="style.css?v=7"></head><body>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>한새벌의 옛날과 오늘날</title><link rel="stylesheet" href="style.css?v=8"></head><body>
 <canvas id="view" tabindex="0" aria-label="학교와 동네의 3D 풍경. WASD 또는 방향키로 이동하고 Q E로 회전, 더하기 빼기로 확대 축소합니다."></canvas><div id="labels"></div>
 <header class="panel"><h1>한새벌의 옛날과 오늘날</h1><div class="subtitle">학교와 동네의 변화</div></header>
 <div class="tools panel"><button id="zoomIn" aria-label="확대">＋</button><button id="zoomOut" aria-label="축소">－</button><button id="home">처음 위치</button><button id="firstPerson" aria-pressed="false">시점: 둘러보기</button><button id="teleport" aria-pressed="false" title="누른 뒤 이동할 바닥을 클릭하거나 터치하세요">순간 이동</button><button id="school">우리 학교</button><button id="top">위에서</button><button id="names" aria-pressed="true">설명 숨김</button><button id="touchToggle" aria-pressed="false">이동 버튼</button><button id="full">전체 화면</button><div id="gpu">준비 중</div></div>
 <div class="caption panel"><strong id="eraTitle">오늘날의 우리 동네</strong><p id="eraText">학교와 대학, 집과 도로가<br>모여 있는 오늘날의 풍경</p></div>
-<div class="meet panel"><button id="meetPeople">사람 만나기</button><button id="magpies">까치 보기</button><button id="well">우물 살펴보기</button><button id="dyke">둑 쌓는 곳</button><button id="college">대학 둘러보기</button><button id="compare">같은 점 · 다른 점</button></div><section id="speech" class="panel" hidden role="dialog" aria-label="생활 이야기"><button class="close" id="speechClose" aria-label="대화 닫기">✕</button><h2 id="speaker"></h2><p id="speechText" aria-live="polite"></p><button id="speechNext">다음 이야기 →</button></section><div class="help">WASD 이동 · Shift 달리기 · Space 점프 · F 대화 · 드래그: 시선</div>
+<div class="meet panel"><nav class="sceneTabs" aria-label="놀이와 일하는 모습"><button id="oldPlay">옛날 아이들의 놀이</button><button id="nowPlay">오늘날 아이들의 놀이</button><button id="oldWork">옛날 일하는 사람들</button></nav><button id="meetPeople">사람 만나기</button><button id="magpies">까치 보기</button><button id="well">우물 살펴보기</button><button id="dyke">둑 쌓는 곳</button><button id="college">대학 둘러보기</button><button id="compare">같은 점 · 다른 점</button></div><section id="speech" class="panel" hidden role="dialog" aria-label="생활 이야기"><button class="close" id="speechClose" aria-label="대화 닫기">✕</button><h2 id="speaker"></h2><p id="speechText" aria-live="polite"></p><button id="speechNext">다음 이야기 →</button></section><div class="help">WASD 이동 · Shift 달리기 · Space 점프 · F 대화 · 드래그: 시선</div>
 <nav class="era panel" aria-label="시대 선택"><button id="past" aria-pressed="false">옛날<small>대조리 · 한새벌</small></button><button id="present" class="active" aria-pressed="true">오늘날<small>학교와 동네</small></button></nav>
 <div id="touchMove" class="panel" aria-label="화면 이동 버튼"><button data-move="KeyQ" aria-label="왼쪽으로 회전">↶</button><button data-move="KeyW" aria-label="앞으로 이동">▲</button><button data-move="KeyE" aria-label="오른쪽으로 회전">↷</button><button data-move="KeyA" aria-label="왼쪽으로 이동">◀</button><span>이동</span><button data-move="KeyD" aria-label="오른쪽으로 이동">▶</button><span></span><button data-move="KeyS" aria-label="뒤로 이동">▼</button><span></span></div><div id="walkActions" class="panel"><button id="runButton" aria-pressed="false">달리기</button><button id="jumpButton">점프</button><button id="talkButton">대화 F</button><button id="lookButton">마우스 시선</button></div><div id="reticle">+</div><div class="compass"><span id="north">↑</span>N</div><div id="toast" role="status"></div>
 <div id="loading"><h2>우리 동네를 펼치는 중입니다</h2><p id="loadText">학교 건물과 우리 동네의 풍경을 준비하고 있습니다.</p></div>
@@ -22,5 +22,6 @@
 <script src="assets/reference-8.js"></script>
 <script src="assets/reference-9.js"></script>
 <script src="assets/school-badge-reference.js"></script>
-<script src="teleport.js?v=7"></script>
-<script src="app.js?v=7"></script></body></html>
+<script src="teleport.js?v=8"></script>
+<script src="assets/stone-reference.js"></script>
+<script src="app.js?v=8"></script></body></html>

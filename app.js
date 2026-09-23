@@ -97,7 +97,7 @@ function nearRoad(u,v,r){const x=X(u),z=Z(v);return roadNetwork.some(([pts,w])=>
 // Neighbourhood blocks follow the street density of the reference, outside the campus.
 function reservedRoute(x,z){const pts=[[321,194],[410,205],[535,222],[650,246]];return pts.slice(1).some((b,i)=>{const a=pts[i],dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));return Math.hypot(x-a[0]-dx*t,z-a[1]-dz*t)<35})}
 function reservedCampus(x,z){return inside(x,z,[[0,310],[427,-100],[1105,453],[1193,625],[760,1120],[270,1020],[-100,590]].map(([u,v])=>{const a=mapPoint(u,v);return[a[0],a[2]]}))}
-function reservedContext(x,z){return reservedCampus(x,z)||reservedRoute(x,z)||(x>162&&x<542&&z>285&&z<719)||(x>-425&&x<-260&&z>-280&&z<-110)||(Math.hypot(x-585,z-210)<55||Math.hypot(x-405,z-156)<35)||Math.hypot(x-361,z-82)<18}
+function reservedContext(x,z){const a=43*Math.PI/180,dx=x+195,dz=z-665,lx=dx*Math.cos(a)-dz*Math.sin(a),lz=dx*Math.sin(a)+dz*Math.cos(a);if(lx>-216&&lx<78&&lz>-36&&lz<112)return true;return reservedCampus(x,z)||reservedRoute(x,z)||(x>162&&x<542&&z>285&&z<719)||(x>-425&&x<-260&&z>-280&&z<-110)||(Math.hypot(x-585,z-210)<55||Math.hypot(x-405,z-156)<35)||Math.hypot(x-361,z-82)<18}
 function inSchoolArea(x,z){const o=mapPoint(375,833),dx=x-o[0],dz=z-o[2],a=43*Math.PI/180,lx=dx*Math.cos(a)-dz*Math.sin(a),lz=dx*Math.sin(a)+dz*Math.cos(a);return lx>-80&&lx<86&&lz>-65&&lz<128}
 
 function inside(x,y,vs){let c=false;for(let i=0,j=vs.length-1;i<vs.length;j=i++){let a=vs[i],b=vs[j];if(((a[1]>y)!=(b[1]>y))&&(x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0]))c=!c}return c}
@@ -168,7 +168,7 @@ school.box(stone,-46,.98,38,1.1,1.96,54);school.box(grass,-49,1.95,38,5,.2,54);
 // Thin round steel tubes for the photographed climbing frames and railings.
 function tube(f,m,a,b,r=.06,sides=8){let aa=f.point(...a),bb=f.point(...b),axis=bb.map((v,i)=>v-aa[i]),len=Math.hypot(...axis);if(len<1e-6)return;axis=axis.map(v=>v/len);let helper=Math.abs(axis[1])<.95?[0,1,0]:[1,0,0],cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],u=cross(axis,helper),ul=Math.hypot(...u);u=u.map(v=>v/ul);let v=cross(axis,u),p=[],n=[],uv=[],idx=[];for(let j=0;j<=1;j++)for(let i=0;i<=sides;i++){const t=i/sides*Math.PI*2,nn=u.map((a,k)=>a*Math.cos(t)+v[k]*Math.sin(t));p.push(...aa.map((a,k)=>a+axis[k]*len*j+nn[k]*r));n.push(...nn);uv.push(i/sides,j)}for(let i=0;i<sides;i++){const a=i,b=i+sides+1;idx.push(a,a+1,b,a+1,b+1,b)}geom(now,m,p,n,uv,idx)}
 // Separate botanical silhouettes: branching pine crowns versus jointed bamboo culms.
-const pineBark=surface('pineBark','#655d50','soil',2),bambooStem=mat('bambooStem','#5d7051'),bambooNode=mat('bambooNode','#93a17b');
+const pineBark=surface('pineBark','#655d50','soil',2),bambooStem=mat('bambooStem','#638353'),bambooNode=mat('bambooNode','#94ad78');
 let vegetationSeed=731;const vr=()=>{vegetationSeed=(1664525*vegetationSeed+1013904223)>>>0;return vegetationSeed/4294967296};const vv=(a,b)=>a+(b-a)*vr();
 function foliageMaterial(name,pine){const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d');
  for(let k=0;k<(pine?23:13);k++){const start=[256,490],tip=[vv(35,477),vv(28,275)],dx=tip[0]-start[0],dy=tip[1]-start[1];g.strokeStyle=pine?'#635e3b':'#718251';g.lineWidth=pine?2.5:1.7;g.beginPath();g.moveTo(...start);g.lineTo(...tip);g.stroke();
@@ -184,19 +184,27 @@ function photoPine(x,z,s=1){const bend=vv(-.7,.9),turn=vv(-.5,.5),levels=[[x,.3,
  }
  for(let k=0;k<10;k++){const a=k*2.4;foliageCard(school,pineNeedles,x+.45+Math.cos(a)*.75*s,(11.8+Math.sin(k)*.35)*s,z-.2+Math.sin(a)*.75*s,2.5*s,1.9*s,k*41,35+k%4*12)}
 }
-function bambooPlant(f,x,z,h,lean=0){const base=f.point(x,0,z);if(pathDistance(base[0],base[2],bambooRouteWorld)<6.4)return;const bendZ=vv(-.35,.35);for(let j=0;j<4;j++){let t=j/4,u=(j+1)/4;tube(f,bambooStem,[x+lean*t*t,.3+h*t,z+bendZ*t*t],[x+lean*u*u,.3+h*u,z+bendZ*u*u],.065*(1-t*.35),6)}for(let y=.9;y<h;y+=.72){const t=y/h;tube(f,bambooNode,[x+lean*t*t,y,z+bendZ*t*t],[x+lean*t*t,y+.035,z+bendZ*t*t],.075*(1-t*.35),6)}
- for(let k=0;k<7;k++){const y=h*(.53+k*.064),t=y/h,a=k*2.399+vv(0,.3),r=vv(.65,1.45),bx=x+lean*t*t,bz=z+bendZ*t*t,ex=bx+Math.cos(a)*r,ez=bz+Math.sin(a)*r;tube(f,bambooStem,[bx,y,bz],[ex,y+.28,ez],.018,5);for(let q=0;q<2;q++)foliageCard(f,bambooLeaves,ex,y+.55,ez,vv(1.55,2.15),vv(1.35,1.85),a*57.3+q*85,vv(-30,30))}
+// Simple open bamboo: straight jointed stems and a few clean lance leaves.
+const bambooSimpleLeaf=mat('bambooSimpleLeaf','#527343');bambooSimpleLeaf.cull=pc.CULLFACE_NONE;bambooSimpleLeaf.twoSidedLighting=true;bambooSimpleLeaf.update();
+function bambooPlant(f,x,z,h,lean=0){const base=f.point(x,0,z);if(pathDistance(base[0],base[2],bambooRouteWorld)<6.4)return;h=6.7+(h%2.4);lean*=.25;
+ tube(f,bambooStem,[x,.3,z],[x+lean,h,z],.10,7);
+ for(let y=1;y<h;y+=1.05){const t=y/h;tube(f,bambooNode,[x+lean*t,y,z],[x+lean*t,y+.045,z],.112,7)}
+ for(let k=0;k<4;k++){const y=h-2.5+k*.65,a=k*2.4,dx=Math.cos(a),dz=Math.sin(a),bx=x+lean*y/h;
+ tube(f,bambooStem,[bx,y,z],[bx+dx*1.05,y+.2,z+dz*1.05],.022,5);
+ for(let j=0;j<5;j++){const t=.27+j*.17,px=bx+dx*t,py=y+.2*t,pz=z+dz*t,side=j%2?1:-1,l=.55+(j%2)*.12,ex=dx*.26-dz*side*l,ez=dz*.26+dx*side*l;
+ const ps=[[px,py,pz],[px+ex*.45-dz*.075,py-.06,pz+ez*.45+dx*.075],[px+ex,py-.32,pz+ez],[px+ex*.45+dz*.075,py-.13,pz+ez*.45-dx*.075]].map(q=>f.point(...q));geom(now,bambooSimpleLeaf,ps.flat(),Array(4).fill([0,1,0]).flat(),[0,0,1,0,1,1,0,1],[0,1,2,0,2,3]);}
+ }
 }
 
 // Lawn edge: mature pines in the red rectangle. The grove behind them is bamboo.
 for(let z=17;z<=62;z+=7.3)photoPine(42,z,.95+(z%3)*.045);
 for(let z=17;z<64;z+=1.55)school.sphere(leaf,42,.9,z,1.5,.65,1.08);
-for(let i=0;i<156;i++){const x=55.2+(i%6)*1.23,z=8+Math.floor(i/6)*2.2;bambooPlant(school,x,z,10.4+(i%7)*.48,(i%3-1)*.5)}
+for(let i=0;i<60;i++){const x=55.2+(i%3)*2.1,z=8+Math.floor(i/3)*2.8;bambooPlant(school,x,z,10.4+(i%7)*.48,(i%3-1)*.5)}
 function shelter(x,z){for(let q of [-1,1])for(let r of [-1,1])school.box(wood,x+q*1.55,1.7,z+r*1.1,.12,2.8,.12);for(let row=0;row<12;row++){school.box(wood,x, .65+row*.18,z-1.1,3.2,.115,.1);for(let q of [-1,1])school.box(wood,x+q*1.55,.65+row*.18,z,.1,.115,2.2)}school.box(wood,x,.62,z,3.1,.14,2.2);for(let q of [-1,1])for(let k=0;k<12;k++){let xx=q*(k+.5)*1.8/12,yy=3.6-Math.abs(xx)*.5;school.box(roofDark,x+xx,yy,z,.18,.12,2.7)}}
 for(let z of [20,30.5,41,51.5]){shelter(-40.5,z);const p=school.point(-43.2,0,z-2);tree(now,p[0],p[2],.72)}
 // White low fence and hedges separate grass from the sand play space.
-for(let x=-37;x<=37;x+=1.5){tube(school,white,[x,.45,64],[x,1.45,64],.035);if(x<37){tube(school,white,[x,.83,64],[x+1.5,.83,64],.026);tube(school,white,[x,1.1,64],[x+1.5,1.1,64],.026)}for(let i=0;i<2;i++){let cx=x+.35+i*.65;for(let k=0;k<8;k++){let a=k/8*Math.PI*2,b=(k+1)/8*Math.PI*2;tube(school,white,[cx+Math.cos(a)*.2,1.21+Math.sin(a)*.21,64],[cx+Math.cos(b)*.2,1.21+Math.sin(b)*.21,64],.017)}}}
-for(let x=-37;x<=37;x+=1.4)if(x<-17||x>18)school.sphere(leaf,x,.85,63,.95,.52,.66);
+for(let x=-37;x<=31;x+=1.5){tube(school,white,[x,.45,64],[x,1.45,64],.035);if(x<37){tube(school,white,[x,.83,64],[x+1.5,.83,64],.026);tube(school,white,[x,1.1,64],[x+1.5,1.1,64],.026)}for(let i=0;i<2;i++){let cx=x+.35+i*.65;for(let k=0;k<8;k++){let a=k/8*Math.PI*2,b=(k+1)/8*Math.PI*2;tube(school,white,[cx+Math.cos(a)*.2,1.21+Math.sin(a)*.21,64],[cx+Math.cos(b)*.2,1.21+Math.sin(b)*.21,64],.017)}}}
+for(let x=-37;x<=31;x+=1.4)if(x<-17||x>18)school.sphere(leaf,x,.85,63,.95,.52,.66);
 for(let x=-39;x<37;x+=.64)school.box([bluePanel,orangePanel,greenPanel][Math.floor((x+40)/3)%3],x,.48,65,.58,.22,.4);
 function palm(f,x,z){f.box(wood,x,2.1,z,.22,4.2,.22);for(let i=0;i<9;i++){let a=i*6.283/9;for(let k=0;k<4;k++){let r=.3+k*.42;f.sphere(leaf,x+Math.sin(a)*r,4.4-k*k*.09,z+Math.cos(a)*r,.28,.14,.57)}}}
 palm(school,-28,62);palm(school,10,62);
@@ -266,14 +274,19 @@ for(let x of [-10.8,-8.2,-5.7]){kkachi.box(windowReflect,x,5.3,20.25,1.2,2,.1);k
 kkachi.box(dark,2,1.75,20.18,10.3,3.5,.22);kkachi.box(windowReflect,2,1.75,20.35,10,3.25,.08);for(let x=-3;x<=7;x+=2)kkachi.box(metal,x,1.75,20.45,.09,3.3,.1);kkachi.box(metal,2,2.55,20.46,10,.08,.1);
 kkachi.box(stone,2,3.95,22.2,15.2,1.05,4.5);for(let x of [-4,8])tube(kkachi,stone,[x,.2,23.3],[x,3.45,23.3],.43,16);
 kkachi.box(pavers,0,.12,23,29,.24,7);
-for(let k=0;k<18;k++){const z=25.3-k*.51,top=.22+k*.18;kkachi.box(stone,-16,top/2,z,7,top,.55);for(let x of [-19.9,-12.1])kkachi.box(brick,x,(top+.7)/2,z,.65,top+.7,.56)}
-for(let x of [-19.9,-12.1])tube(kkachi,stone,[x,1.02,25.3],[x,4.05,16.1],.08);
+for(let k=0;k<26;k++){const z=26-k*.55,top=.22+k*.19;kkachi.box(stone,-16,top/2,z,7,top,.55);for(let x of [-19.9,-12.1])kkachi.box(brick,x,(top+.7)/2,z,.65,top+.7,.56)}
+for(let x of [-19.9,-12.1])tube(kkachi,stone,[x,1.02,26],[x,5.77,12.25],.08);
 for(let z=-17;z<18;z+=4.4){kkachi.box(windowReflect,12.58,4.8,z,.1,4.8,2.8);kkachi.box(stone,12.72,4.8,z-1.45,.2,6.2,.25)}
 // Brick retaining beds beside the stairs and the end-of-main-building glazed stairwell.
 for(let z of [15,19,23]){kkachi.box(brick,-21,.7,z,2,1.4,3);kkachi.sphere(leaf,-21,1.8,z,1.3,.65,1.5)}
-for(let row=0;row<4;row++){const y=2.3+row*4.45;school.sphere(windowReflect,43.4,y,-3,1.5,1.9,2.1);school.box(stone,43.7,y+1.95,-3,2.9,.25,4.1)}
+for(let row=0;row<4;row++){const y=2.3+row*4.45;school.box(windowReflect,43.58,y,-2.5,.15,3.9,4.5);for(let z=-4.7;z<=0;z+=1.1)school.box(white,43.69,y,z,.12,3.95,.065);school.box(stone,43.7,y+1.95,-2.5,.2,.25,4.8)}
 const approach=frame(kp[0],kp[2],schoolAngle+90);approach.box(asphalt,0,.1,37,57,.2,19);for(let x=-23;x<25;x+=3.1)approach.box(orangePanel,x,.22,35,1.5,.035,4.7);
-sign(kkachi,'까치관',1,9.8,20.5,10,1);
+wallText(kkachi,'까 치 관',2,7.65,20.51,7.7,.95,'#184f86');
+for(let x=-12;x<=12;x+=2)kkachi.box(stoneDark,x,8.18,20.34,.025,.95,.05);
+for(let x=-5;x<10;x+=1.35)kkachi.box(stoneDark,x,3.98,24.49,.025,.82,.025);
+for(let y=1;y<8;y+=1.2)kkachi.box(stoneDark,0,y,20.205,25,.014,.025);
+for(let x=-11.5;x<13;x+=3)kkachi.box(stoneDark,x,4.3,20.206,.014,8.1,.025);
+kkachi.box(stone,-16,4.92,10.7,7,.22,3);
 
 // University roof topology: transverse wings, connecting corridors, courts and formal landscaping.
 // Transverse university wings are authored below.
@@ -314,11 +327,11 @@ for(let i=0;i<5;i++)ellipsoid(old,mud,-378+i*.8,.5,226,.36,.55,.36);for(let i=0;
 
 // Magpies inhabit the green lawn in the present-day school compound only.
 const magpies=[];const magpieBlue=mat('magpieBlue','#173b4b',42);
-for(let i=0;i<5;i++){const lp=[[-13,28],[-10,30],[5,23],[18,32],[20,28]][i],wp=school.point(lp[0],0,lp[1]);const bird=new pc.Entity('magpie-'+i);now.addChild(bird);bird.setPosition(wp[0],.48,wp[2]);bird.setEulerAngles(0,i*71+15,0);const body=new pc.Entity('magpieBody');bird.addChild(body);
+for(let i=0;i<10;i++){const lp=[[-13,28],[-10,30],[5,23],[18,32],[20,28]][i%5],wp=school.point(lp[0],0,lp[1]);const bird=new pc.Entity('magpie-'+i);(i<5?now:old).addChild(bird);bird.setPosition(wp[0],.48,wp[2]);bird.setEulerAngles(0,i*71+15,0);const body=new pc.Entity('magpieBody');bird.addChild(body);
 primitive(body,'sphere',black,0,.35,0,.29,.38,.47);primitive(body,'sphere',white,0,.28,-.04,.25,.27,.32);primitive(body,'sphere',black,0,.61,-.22,.24,.24,.26);primitive(body,'box',dark,0,.59,-.4,.07,.055,.21);
 for(let side of [-1,1]){primitive(body,'sphere',magpieBlue,side*.135,.39,.055,.11,.3,.36);primitive(body,'sphere',white,side*.16,.46,-.04,.08,.17,.18);primitive(body,'cylinder',dark,side*.073,.09,0,.025,.22,.025);primitive(body,'box',dark,side*.073,0,-.035,.045,.022,.15);primitive(body,'sphere',white,side*.108,.64,-.25,.018,.018,.018)}
-const tail=primitive(body,'box',magpieBlue,0,.26,.43,.17,.05,.61);tail.setLocalEulerAngles(-14,0,0);magpies.push({entity:bird,body,x:wp[0],z:wp[2],phase:i*1.6})}
-function animateMagpies(t){if(era!=='now')return;for(let b of magpies){const v=t*.8+b.phase,hop=Math.max(0,Math.sin(v*4))*.095;b.entity.setPosition(b.x+Math.sin(v)*.5,.48+hop,b.z+Math.cos(v)*.35);b.body.setLocalEulerAngles(Math.sin(v*2)> .65?24:0,0,0)}}
+const tail=primitive(body,'box',magpieBlue,0,.26,.43,.17,.05,.61);tail.setLocalEulerAngles(-14,0,0);magpies.push({entity:bird,body,x:wp[0],z:wp[2],phase:i*1.6,era:i<5?'now':'old'})}
+function animateMagpies(t){for(let b of magpies){if(b.era!==era)continue;const v=t*.8+b.phase,hop=Math.max(0,Math.sin(v*4))*.095;b.entity.setPosition(b.x+Math.sin(v)*.5,(b.era==='old'?.23:.48)+hop,b.z+Math.cos(v)*.35);b.body.setLocalEulerAngles(Math.sin(v*2)> .65?24:0,0,0)}}
 
 // Both eras share the well's map location. Its surroundings and construction change over time.
 const wellPoint=mapPoint(...mapAnchors.well),wellX=wellPoint[0],wellZ=wellPoint[2],wellStone=mat('wellStone','#a1a6a5',12),pavingStone=mat('wellPaving','#596461',6),wellTimber=mat('wellTimber','#986237',10),roofTile=mat('roofTile','#52616a',18),plaster=mat('wellPlaster','#e4e6df'),buildingBeige=mat('buildingBeige','#cdbf9e');
@@ -362,7 +375,7 @@ function animateWell(t){if(era!=='old')return;const lift=(Math.sin(t*.85)+1)*.6;
 
 // Photograph-guided additions to the existing school volumes.
 function wallText(f,text,x,y,z,w,h,color='#214c76',bg=null){
- if(!/^(어린이|보호구역|20|30|카페|문구|GS25|STARBUCKS|COFFEE|안내|35 송죽관)$/.test(text))return;
+ if(!/^(어린이|보호구역|20|30|카페|문구|GS25|STARBUCKS|COFFEE|안내|35 송죽관|까 치 관|부산지방검찰청|부산지방법원|부산교육대학교)$/.test(text))return;
  const c=document.createElement('canvas');c.width=1024;c.height=128;const g=c.getContext('2d');if(bg){g.fillStyle=bg;g.fillRect(0,0,c.width,c.height)}g.fillStyle=color;g.font='bold 70px "Malgun Gothic", "Noto Sans CJK KR", sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(text,512,64,980);
  const rgba=g.getImageData(0,0,c.width,c.height).data,t=new pc.Texture(device,{width:c.width,height:c.height,format:pc.PIXELFORMAT_RGBA8,mipmaps:true,flipY:false});const dest=t.lock(),stride=c.width*4;for(let row=0;row<c.height;row++)dest.set(rgba.subarray((c.height-1-row)*stride,(c.height-row)*stride),row*stride);t.unlock();
  const m=mat('lettering'+Object.keys(mats).length,'#ffffff',8);m.diffuseMap=t;m.opacityMap=t;m.opacityMapChannel='a';m.alphaTest=.2;m.cull=pc.CULLFACE_BACK;m.update();f.quad(m,[[x-w/2,y-h/2,z],[x+w/2,y-h/2,z],[x+w/2,y+h/2,z],[x-w/2,y+h/2,z]],[0,0,1,0,1,1,0,1]);
@@ -409,15 +422,28 @@ const towerSites=[[-54,62,24],[-15,67,27],[28,70,24],[58,27,25],[20,17,29],[-27,
 function apartment(f,x,z,levels){let h=levels*2.8;f.box(apartmentWhite,x,h/2,z,23,h,14);f.box(apartmentWhite,x,h/2,z-7,12,h,9);f.box(apartmentBrown,x+3,h/2,z+7.08,4.8,h,.2);f.box(apartmentGray,x-10,h/2,z+7.1,2.1,h,.2);for(let floor=0;floor<levels;floor++){let y=1.5+floor*2.8;for(let xx of [-7.5,-3,7.6])for(let q of [-1,1]){f.box(windowReflect,x+xx,y,z+q*7.16,2.9,1.9,.08);f.box(apartmentWhite,x+xx,y-.98,z+q*7.29,3.35,.12,.4)}for(let zz of [-4,1,5])for(let q of [-1,1])f.box(windowReflect,x+q*11.59,y,z+zz,.1,1.7,2.1)}f.box(apartmentGray,x,h+.24,z,23.7,.48,14.6);f.box(apartmentWhite,x+2,h+2,z-2,8,4,7)}
 for(let [x,z,h]of towerSites)apartment(estate,x,z,h);
 for(let i=0;i<32;i++){let x=-74+(i%8)*20,z=-85+Math.floor(i/8)*52;estate.sphere(leaf2,x,3.3,z,2.8,3.2,2.7)}
-// Civic complex: long main block, central glass atrium, projecting wings and a circular forecourt. Unlabelled.
-const civic=frame(contextSites.civic.x,contextSites.civic.z,43);civic.box(pavers,0,.12,34,178,.24,156);civic.box(urbanPlaster,0,24,0,134,48,27);civic.box(urbanPlaster,0,27,0,30,54,30);civic.box(windowReflect,0,25.2,15.2,24,48,.2);
-for(let x of [-54,54])civic.box(urbanPlaster,x,17.5,19,27,35,48);
-for(let f=0;f<13;f++){let y=3+f*3.45;for(let x=-62;x<=62;x+=5.2){if(Math.abs(x)<15)continue;civic.box(windowReflect,x,y,13.65,3.3,2.25,.13);civic.box(curb,x,y-1.3,13.85,3.8,.15,.42)}civic.box(curb,0,y+1.7,15.36,25,.13,.16)}for(let x=-11;x<=12;x+=3.5)civic.box(metal,x,25.2,15.4,.14,48,.18);
-for(let x of [-54,54])for(let f=0;f<9;f++)for(let xx=-10;xx<=10;xx+=5)civic.box(windowReflect,x+xx,3+f*3.45,43.12,3,2.3,.1);
-civic.box(stone,0,4.9,20,37,1.25,11);for(let x=-15;x<=15;x+=6)tube(civic,stone,[x,.2,24],[x,4.3,24],.55,12);civic.box(dark,0,1.9,15.5,21,3.8,.2);
-for(let k=0;k<8;k++)civic.box(stone,0,.08+k*.12,31-k*.55,40,.16+k*.24,.65);
-for(let k=0;k<64;k++){let a=k*6.283/64,b=(k+1)*6.283/64;tube(civic,asphalt,[Math.cos(a)*27,.2,76+Math.sin(a)*22],[Math.cos(b)*27,.2,76+Math.sin(b)*22],3.9,6)}civic.sphere(grass,0,.24,76,22,.14,17);civic.box(stone,0,.8,76,7,1.6,7);for(let k=0;k<28;k++){let a=k*6.283/28,b=(k+1)*6.283/28;tube(civic,metal,[Math.cos(a)*3.3,4.7+Math.sin(a)*3.3,76],[Math.cos(b)*3.3,4.7+Math.sin(b)*3.3,76],.31,8)}
-for(let i=0;i<25;i++){let x=-78+(i%5)*6,z=43+Math.floor(i/5)*11;civic.box(white,x,.27,z,.11,.03,5.2)}for(let x of [-46,46])for(let z of [58,75,94])civic.sphere(leaf,x,2.4,z,2.8,2.1,2.5);
+// Courthouse at the right of the reference and prosecution office beside it.
+const civic=frame(contextSites.civic.x,contextSites.civic.z,43),legalStone=surface('legalStone','#d1d0c7','stone',3);
+civic.box(pavers,0,.12,30,144,.24,135);
+civic.box(legalStone,0,28,0,104,56,28);civic.box(windowReflect,0,31,14.2,20,60,.25);
+for(let x of [-29,29]){civic.box(legalStone,x,31.5,0,37,63,30);civic.box(white,x,64,0,40,1.4,32)}
+for(let row=0;row<16;row++)for(let x=-49;x<=49;x+=3.6){if(Math.abs(x)<10)continue;const y=3.2+row*3.5;civic.box(windowReflect,x,y,15.12,1.55,2.25,.12);civic.box(white,x-.95,y,15.25,.12,2.55,.15)}
+for(let x=-9;x<10;x+=1.7)civic.box(metal,x,31,14.4,.09,60,.08);for(let y=2;y<62;y+=1.8)civic.box(metal,0,y,14.4,20,.075,.08);
+civic.box(legalStone,0,6,24,34,12,18);for(let y=2;y<12;y+=3)for(let x=-14;x<15;x+=3)civic.box(windowReflect,x,y,33.1,2,2,.12);
+civic.box(stone,0,3.5,36,20,.65,7);for(let x of [-8,8])tube(civic,stone,[x,.3,38],[x,3.2,38],.4);for(let k=0;k<7;k++)civic.box(stone,0,.12+k*.13,41-k*.6,24,.24+k*.26,.7);
+wallText(civic,'부산지방법원',-28,61.3,15.3,29,1.6,'#425c68');worldLabel('부산지방법원',contextSites.civic.x,contextSites.civic.z,'now',68);
+const prosecutorPoint=civic.point(-139,0,0),prosecutor=frame(prosecutorPoint[0],prosecutorPoint[2],43);
+prosecutor.box(pavers,0,.12,27,142,.24,121);prosecutor.box(legalStone,0,24,0,122,48,30);
+for(let row=0;row<12;row++)for(let x=-56;x<=56;x+=3.1)prosecutor.box(windowReflect,x,5+row*3.35,15.1,1.4,2.05,.13);
+prosecutor.box(dark,14,49,0,89,4,27);prosecutor.box(legalStone,-46,49,0,30,6,30);prosecutor.box(legalStone,13,51.3,0,96,1.4,33);
+for(let x=-28;x<59;x+=10)tube(prosecutor,stone,[x,47,14.5],[x,51,14.5],.23);
+wallText(prosecutor,'부산지방검찰청',-44,49.7,15.2,27,1.7,'#435366');
+prosecutor.box(stone,15,7,22,28,1.1,14);for(let x of [3,27])tube(prosecutor,stone,[x,.3,27],[x,6.5,27],.5);
+for(let k=0;k<10;k++)prosecutor.box(stone,0,.1+k*.12,46-k*.65,52,.2+k*.24,.75);
+for(const f of [civic,prosecutor])for(let x of [-51,51])for(let z of [30,48,65]){f.sphere(leaf,x,3,z,3.5,3,3);f.box(stone,x,.4,z,7,.8,7)}
+tube(prosecutor,dark,[-3,.9,43],[0,8,43],.65,4);tube(prosecutor,dark,[0,8,43],[3,.9,43],.65,4);prosecutor.sphere(stoneDark,-4,1.1,46,2,.5,1.3);
+const courtWorkerPoint=civic.point(3,0,44),courtWorker=makePerson('now',courtWorkerPoint[0],courtWorkerPoint[2],'법원에서 일하는 직원',['저는 부산지방법원에서 일해요. 찾아오신 분들에게 필요한 절차와 장소를 안내해요.','법원은 다툼이 생겼을 때 법에 따라 재판하는 곳이에요.','서로의 이야기를 듣고 자료를 꼼꼼하게 살펴보는 일이 중요해요.'],'clerk','wave',223);
+primitive(courtWorker.group,'box',navy,0,1.04,0,.45,.53,.29);primitive(courtWorker.group,'box',white,0,1.21,-.16,.12,.19,.035);primitive(courtWorker.group,'box',bluePanel,0,1.13,-.185,.035,.19,.025);primitive(courtWorker.group,'box',brownCloth,-.3,.8,-.15,.24,.33,.07);
 // East-side transport corridor: metro entrances and the elevated railway station.
 const station=frame(741,380,-8);station.box(asphalt,0,.08,0,76,.16,195);
 for(let x of [-11,11]){station.box(stone,x,8.8,0,8,.75,180);for(let z=-85;z<90;z+=19)station.box(stone,x,4.1,z,1.6,8.2,2)}
@@ -548,7 +574,7 @@ for(let x of [-10,10]){railing(roundabout,x,-16,x,-7,1.1);campusLamp(roundabout,
 const gatePoint=mapPoint(...mapAnchors.gate);const campusRoute=[[gatePoint[0],gatePoint[2]],[363,200],[410,205],[535,222],[650,246]];
 const routeSegments=[];
 function roadText(f,text,x,z,w,d){const plane={quad:(m,ps,uv)=>{const p=ps.map(([a,b,c])=>f.point(a,.38,-b));geom(now,m,p.flat(),p.flatMap(()=>[0,1,0]),uv,[0,1,2,0,2,3])}};wallText(plane,text,x,-z,0,w,d,'#fff9df')}
-function arrow(f,x,z){f.box(white,x,.345,z,.18,.025,2.1);flatQuad(f,white,[[x-.65,z-1],[x,z-2],[x+.65,z-1],[x,z-1]],.36)}
+function arrow(f,x,z,dir=-1){f.box(white,x,.345,z,.18,.025,2.1);flatQuad(f,white,[[x-.65,z+dir],[x,z+2*dir],[x+.65,z+dir],[x,z+dir]],.36)}
 function signal(f,x,z){tube(f,roadYellow,[x,.3,z],[x,5.1,z],.095);tube(f,roadYellow,[x,5.1,z],[x+(x<0?8:-8),5.1,z],.08);let xx=x+(x<0?6:-6);f.box(dark,xx,4.97,z,1.4,.45,.32);for(let j=0;j<3;j++)f.sphere(j===0?red:j===1?roadYellow:greenPanel,xx-.43+j*.43,4.97,z+.18,.14,.14,.035)}
 function streetCar(f,x,z,index){f.box(carM[index%4],x,.94,z,1.9,1.25,4.5);f.box(windowReflect,x,1.68,z-.12,1.65,.67,2.15);for(let q of [-1,1])for(let zz of [-1.4,1.4])f.sphere(black,x+q*.92,.59,z+zz,.16,.36,.36);for(let q of [-1,1])f.box(white,x+q*.64,.99,z-2.28,.38,.21,.055)}
 for(let s=1;s<campusRoute.length;s++){
@@ -556,9 +582,9 @@ for(let s=1;s<campusRoute.length;s++){
  f.box(asphalt,0,.22,0,10,.22,len+1);for(let q of [-1,1]){f.box(curb,q*5.15,.34,0,.3,.3,len);f.box(pavers,q*7.1,.26,0,3.6,.4,len);f.box(roadYellow,q*6.5,.473,0,.38,.02,len);f.box(white,q*4.7,.343,0,.09,.025,len)}
  for(let q of [-1,1])f.box(roadYellow,q*.14,.344,0,.09,.025,len-2);
  for(let z=-len/2+12;z<len/2-6;z+=22)for(let q of [-1,1]){bareTree(f,q*8.15,z,.7);f.box(stone,q*8.15,.5,z,1.25,.12,1.6);if(q<0)campusLamp(f,q*8.55,z)}
- for(let z=-len/2+14;z<len/2-10;z+=32)arrow(f,-2.5,z);
+ for(let z=-len/2+14;z<len/2-10;z+=32){arrow(f,-2.5,z);arrow(f,2.5,z,1);}
  if(s>=2){for(let q of [-1,1])signal(f,q*7.5,-len/2+6);for(let k=0;k<8;k++)f.box(roadYellow,-4.2+k*1.2,.35,-len/2+8,.65,.025,3.1);f.box(white,0,.35,-len/2+11,10,.025,.22)}
- if(s===3||s===4){roadText(f,'어린이',-2.5,-18,3.7,2.8);roadText(f,'보호구역',-2.5,-22,3.7,2.8);roadText(f,'30',-2.5,-30,2.5,3);streetCar(f,2.5,9,s);}
+ if(s===3||s===4){roadText(f,'어린이',-2.5,-18,3.7,2.8);roadText(f,'보호구역',-2.5,-22,3.7,2.8);roadText(f,'30',-2.5,-30,2.5,3);streetCar(f,-2.5,9,s);const opposite=f.point(2.5,0,-9);streetCar(frame(opposite[0],opposite[2],angle+180),0,0,s+1);}
  if(s>=3)for(let q of [-1,1])for(let z=-len/2+17,j=0;z<len/2-14;z+=16,j++){
   // Breaks between rows leave junctions visible; no commercial brand names are copied.
   const p=f.point(q*16,0,z);if(Math.hypot(p[0]-585,p[2]-210)<52)continue;const store=frame(p[0],p[2],angle+(q<0?90:-90)),w=12+(j%3),d=12,h=8+((j+s)%4)*3.15;
@@ -598,7 +624,7 @@ const aroundSchool=[[-60,139],[90,139],[90,-50]].map(([x,z])=>{const p=school.po
 const crossingPos=mapPoint(474,715),crossing=frame(crossingPos[0],crossingPos[2],-45);
 crossing.box(red,0,.34,0,13,.06,5.5);for(let x=-5.6;x<6;x+=1.3)crossing.box(roadYellow,x,.383,0,.75,.02,4.7);
 const bendPos=mapPoint(620,772),bend=frame(bendPos[0],bendPos[2],79);roadText(bend,'20',0,0,3,3.5);roadText(bend,'어린이',0,6,4,3);roadText(bend,'보호구역',0,10,4,3);
-for(let i=0;i<95;i++){const t=i/94,p=mapPoint(549+t*168,814+Math.sin(t*2.5)*16);bambooPlant(frame(0,0,0),p[0],p[2],10.2+(i%7)*.42,(i%3-1)*.5)}
+for(let i=0;i<34;i++){const t=i/33,p=mapPoint(549+t*168,814+Math.sin(t*2.5)*16);bambooPlant(frame(0,0,0),p[0],p[2],10.2+(i%7)*.42,(i%3-1)*.5)}
 // Connected covered walkways follow the main front and turn along the lawn's western edge.
 const awningRed=mat('awningRed','#de795f'),awningWhite=mat('awningWhite','#e6e8df');
 const canopyPaths=[[[-43,9],[42,9],true,0,0],[[-43,9],[-48,17],false,0,1.8],[[-48,17],[-48,66],false,1.8,1.8]];
@@ -636,7 +662,7 @@ for(let i=1;i<schoolPath.length;i++){
  const a=schoolPath[i-1],b=schoolPath[i],len=Math.hypot(b[0]-a[0],b[1]-a[1]),ang=Math.atan2(b[0]-a[0],b[1]-a[1])*180/Math.PI,f=frame((a[0]+b[0])/2,(a[1]+b[1])/2,ang);
  f.box(asphalt,0,.39,0,7.2,.18,len+.7);
  for(const q of [-1,1]){f.box(curb,q*3.7,.48,0,.24,.3,len+.5);f.box(pavers,q*4.9,.45,0,2.2,.24,len+.5);f.box(white,q*3.25,.495,0,.1,.025,len+2)}
- for(let z=-len/2;z<len/2;z+=1.8)for(const q of [-1,1])for(let r=0;r<3;r++){
+ for(let z=-len/2;z<len/2;z+=4.2)for(const q of [-1,1])for(let r=0;r<1;r++){
   const x=q*(7+r*.65+rand(-.35,.35)),zz=z+rand(-.35,.35),h=rand(5.8,9);
   bambooPlant(f,x,zz,10.5+(h-5.8)*1.05,-q*.75);
  }
@@ -663,7 +689,18 @@ for(const x of [-39,39])for(const z of [12,58,88])campusLamp(school,x,z);
 const dureWorkers=[],playCentre={x:-257,z:302};
 box(old,soil,-335,.3,-76,39,.6,31);box(old,water,-335,.63,-76,37,.055,29);
 for(let x=-351;x<-317;x+=1.3)for(let z=-89;z<-61;z+=1.3){for(let k=-1;k<=1;k++)box(old,paddy,x+k*.09,.85,z,.045,.45+Math.abs(k)*.1,.06,k*13)}
-for(let row=0;row<2;row++)for(let j=0;j<5;j++){const p=makePerson('old',-347+j*5.1,-84+row*10,'함께 김매기하는 두레꾼 '+(row*5+j+1),['여기는 대조리입니다. 이웃들과 함께 논의 잡풀을 뽑고 있어요.','김매기는 벼 사이에 난 풀을 뽑는 일이에요. 벼가 잘 자라도록 돌보지요.','여럿이 힘을 모아 농사일을 하는 모임을 두레라고 해요.','함께 일하고 쉬는 시간에는 새참도 나누어 먹어요.'],'wader','weed',10+j*5);p.entity.setPosition(p.x,.67,p.z);dureWorkers.push(p)}
+const dureLines=[
+ ['여기는 대조리입니다. 이웃들과 함께 논의 김을 매고 있어요.','벼 사이의 잡풀을 뽑아야 벼가 잘 자라요.'],
+ ['벼는 남겨 두고 잡풀만 골라 뽑아요.','뿌리까지 뽑으려면 손에 힘을 주어야 해요.'],
+ ['혼자 하면 오래 걸리지만 함께하면 힘이 나요.','오늘은 이 논, 다음에는 이웃의 논을 도와요.'],
+ ['허리를 오래 숙였더니 뻐근하네요. 잠깐 펴야겠어요.','함께 일하는 이웃과 이야기를 나누면 덜 힘들어요.'],
+ ['휴, 땀이 나네요. 잠깐 땀을 닦고 다시 할게요.','더운 날에는 중간중간 쉬어야 해요.'],
+ ['여럿이 힘을 모아 농사일을 하는 모임을 두레라고 해요.','서로 도우며 마을의 일을 해내지요.'],
+ ['논바닥이 미끄러우니 발을 조심해요.','물과 햇볕을 먹고 벼가 쑥쑥 자라겠지요.'],
+ ['저쪽 줄도 다 매었나요? 이쪽은 조금 남았어요.','먼저 끝나면 이웃을 도우러 갈 거예요.'],
+ ['새참을 가져오셨대요! 이 줄까지 하고 쉬어요.','함께 음식을 나누어 먹으면 더 맛있어요.'],
+ ['가을에 곡식을 거둘 생각을 하며 일해요.','먹을거리를 얻으려면 날마다 논을 돌보아야 해요.']];
+for(let row=0;row<2;row++)for(let j=0;j<5;j++){const i=row*5+j,p=makePerson('old',-347+j*5.1,-84+row*10,'함께 김매기하는 두레꾼 '+(i+1),dureLines[i],'wader','weed',[10,20,-12,65,5,15,-20,-65,25,8][i]);p.entity.setPosition(p.x,.67,p.z);p.workPose=i===4||i===8?'wipe':i===3||i===7?'side':'weed';dureWorkers.push(p)}
 const leader=makePerson('old',-315,-78,'두레의 일을 이끄는 사람',['우리 함께 힘을 모아 이 논부터 매 봅시다!','혼자 하기 힘든 농사일도 이웃들과 함께하면 해낼 수 있어요.','여러분은 친구와 힘을 모아 어떤 일을 해 보았나요?'],'farmer','wave',-60);
 const snack=makePerson('old',-315,-70,'새참을 가져온 사람',['일하느라 수고했어요. 잠시 쉬며 새참을 드세요.','이웃과 음식을 나누고 이야기를 나누어요.'],'water','wave',-70);
 box(old,wood,-315,.8,-68,2,.12,1.2);for(let j=0;j<4;j++)ellipsoid(old,white,-315.7+j*.46,.9,-68,.18,.08,.18);
@@ -681,7 +718,7 @@ const boardKids=[-1,1].map((q,i)=>makePerson('old',sx+10+q*2.8,sz+8,i?'널뛰기
 const kiteKids=[],kites=[];
 for(let i=0;i<2;i++){const x=sx-8+i*7,z=sz+17;const kid=makePerson('old',x,z,'연날리기하는 아이 '+(i+1),['바람을 타고 연이 높이 올라간다!','줄을 조금 풀었다 감았다 하며 연을 날려.','너희가 좋아하는 놀이는 무엇이니?'],'child','kite',10);primitive(kid.group,'box',wood,.3,1,-.3,.35,.12,.12);kiteKids.push(kid);const root=new pc.Entity('kite');old.addChild(root);const diamond=primitive(root,'box',i?red:bluePanel,0,0,0,2.1,2.1,.035);diamond.setLocalEulerAngles(0,0,45);primitive(root,'box',creamCloth,0,0,-.04,.07,2.9,.025);primitive(root,'box',creamCloth,0,0,-.04,2.9,.07,.025);for(let j=0;j<6;j++)primitive(root,'box',i?bluePanel:red,Math.sin(j)*.12,-1.7-j*.35,0,.12,.36,.04);const string=primitive(old,'cylinder',creamCloth,0,0,0,.013,1,.013);kites.push({root,string,x,z,i})}
 worldLabel('그네 · 널뛰기 · 연날리기',sx,sz+8,'old',5);
-function animateVillage(t){if(era!=='old')return;for(let p of dureWorkers){const v=t*1.8+p.phase;p.group.setLocalEulerAngles(47+Math.sin(v)*9,0,0);p.group.setLocalPosition(0,-.15,0);p.arms.forEach((a,i)=>a.setLocalEulerAngles(-25+Math.sin(v+i)*22,0,i?8:-8));p.legs.forEach((l,i)=>l.setLocalEulerAngles(-15,0,i?8:-8))}swing.setLocalEulerAngles(Math.sin(t*1.15)*29,0,0);swingChild.arms.forEach((a,i)=>a.setLocalEulerAngles(-130,0,i?15:-15));const angle=Math.sin(t*2.4)*14;boardRoot.setLocalEulerAngles(0,0,angle);boardKids.forEach((p,i)=>{const q=i?1:-1,y=.82+q*2.8*Math.sin(angle*Math.PI/180)+Math.max(0,Math.sin(t*2.4+q*Math.PI/2))*.55;p.entity.setPosition(sx+10+q*2.8,y,sz+8);p.arms.forEach((a,j)=>a.setLocalEulerAngles(0,0,(j?1:-1)*65))});for(const k of kites){const y=17+k.i*4+Math.sin(t*.8+k.i),x=k.x+5+Math.sin(t*.45+k.i)*2,z=k.z-13+Math.cos(t*.4)*1.5;k.root.setPosition(x,y,z);k.root.setEulerAngles(-12,Math.sin(t*.6)*15,Math.sin(t)*9);const a=new pc.Vec3(k.x+.3,1.1,k.z-.3),b=new pc.Vec3(x,y,z),delta=b.clone().sub(a);k.string.setPosition(a.clone().add(b).mulScalar(.5));k.string.setLocalScale(.013,delta.length(),.013);k.string.setRotation(new pc.Quat().setFromDirections(pc.Vec3.UP,delta.normalize()))}}
+function animateVillage(t){if(era!=='old')return;for(let p of dureWorkers){const v=t*1.8+p.phase,wipe=p.workPose==='wipe'&&Math.sin(t*.55+p.phase)>.1,side=p.workPose==='side';const bend=wipe?-6:side?-28:-52-Math.sin(v)*6;p.group.setLocalEulerAngles(bend,0,0);p.group.setLocalPosition(0,.8*(1-Math.cos(bend*Math.PI/180)),Math.sin(bend*Math.PI/180)*.8);p.arms.forEach((a,i)=>a.setLocalEulerAngles(wipe?(i?145:0):35+Math.sin(v+i)*12,0,wipe?(i?-25:-5):(i?8:-8)));p.legs.forEach((l,i)=>l.setLocalEulerAngles(-bend,0,i?5:-5))}swing.setLocalEulerAngles(Math.sin(t*1.15)*29,0,0);swingChild.arms.forEach((a,i)=>a.setLocalEulerAngles(-130,0,i?15:-15));const angle=Math.sin(t*2.4)*14;boardRoot.setLocalEulerAngles(0,0,angle);boardKids.forEach((p,i)=>{const q=i?1:-1,y=.82+q*2.8*Math.sin(angle*Math.PI/180)+Math.max(0,Math.sin(t*2.4+q*Math.PI/2))*.55;p.entity.setPosition(sx+10+q*2.8,y,sz+8);p.arms.forEach((a,j)=>a.setLocalEulerAngles(0,0,(j?1:-1)*65))});for(const k of kites){const y=17+k.i*4+Math.sin(t*.8+k.i),x=k.x+5+Math.sin(t*.45+k.i)*2,z=k.z-13+Math.cos(t*.4)*1.5;k.root.setPosition(x,y,z);k.root.setEulerAngles(-12,Math.sin(t*.6)*15,Math.sin(t)*9);const a=new pc.Vec3(k.x+.3,1.1,k.z-.3),b=new pc.Vec3(x,y,z),delta=b.clone().sub(a);k.string.setPosition(a.clone().add(b).mulScalar(.5));k.string.setLocalScale(.013,delta.length(),.013);k.string.setRotation(new pc.Quat().setFromDirections(pc.Vec3.UP,delta.normalize()))}}
 // Point lights are pooled: only nearby lamps illuminate the night scene.
 const nightPool=[];for(let i=0;i<10;i++){const l=new pc.Entity('pooled-streetlight');l.addComponent('light',{type:'omni',color:new pc.Color(1,.78,.46),intensity:2.4,range:19,castShadows:false,falloffMode:pc.LIGHTFALLOFF_INVERSESQUARED});now.addChild(l);l.enabled=false;nightPool.push(l)}
 const moonMaterial=mat('moon','#edf1ff');moonMaterial.useLighting=false;moonMaterial.emissive=new pc.Color(.55,.65,.9);moonMaterial.update();const moon=primitive(shared,'sphere',moonMaterial,-700,1200,-1900,35,35,35);moon.enabled=false;
@@ -695,22 +732,56 @@ function applyLighting(){const night=isNight;daylightButton.textContent=night?'�
 function updateNightLights(){const active=isNight&&era==='now';let nearby=active?[...lampPositions].sort((a,b)=>Math.hypot(a.x-desired.x,a.z-desired.z)-Math.hypot(b.x-desired.x,b.z-desired.z)):[];nightPool.forEach((l,i)=>{l.enabled=active&&i<nearby.length;if(l.enabled){const p=nearby[i];l.setPosition(p.x,p.y,p.z);l.light.intensity=p.shop?5:4.5;l.light.range=p.shop?25:30}})}
 
 for(const p of lampPositions){const bulb=primitive(now,'box',lampGlow,p.x,p.y+.12,p.z,.55,.065,.23);bulb.render.castShadows=false}
+// School motto stone at the lawn/path corner, textured from the supplied photograph.
+const monumentPoint=school.point(36,0,60),monument=frame(monumentPoint[0],monumentPoint[2],schoolAngle),mottoRock=surface('mottoRock','#888c7c','soil',1);
+const rockOutline=[[-.95,.28],[-.94,1.62],[-.68,2.25],[-.16,2.48],[.47,2.55],[.86,2.18],[1.01,1.3],[.89,.19],[.38,.04],[-.68,.1]];for(let i=0;i<rockOutline.length;i++){const a=rockOutline[i],b=rockOutline[(i+1)%rockOutline.length];solidFace(monument,mottoRock,[[a[0],a[1],.5],[b[0],b[1],.5],[b[0]*.85,b[1],-.42],[a[0]*.85,a[1],-.42]])}monument.sphere(mottoRock,-1.36,.38,0,.8,.42,.6);monument.sphere(mottoRock,1.3,.42,-.05,.8,.5,.62);
+const stonePhoto=new Image();stonePhoto.src=window.stoneReference;await stonePhoto.decode();const sc=document.createElement('canvas');sc.width=512;sc.height=640;const sxg=sc.getContext('2d');sxg.scale(512/770,640/930);sxg.translate(-675,-235);sxg.beginPath();[[712,578],[812,357],[1002,273],[1220,245],[1348,287],[1405,460],[1433,794],[1401,1097],[1209,1151],[826,1134],[710,1037]].forEach((p,i)=>i?sxg.lineTo(...p):sxg.moveTo(...p));sxg.closePath();sxg.clip();sxg.drawImage(stonePhoto,0,0);
+const st=new pc.Texture(device,{width:512,height:640,format:pc.PIXELFORMAT_RGBA8,mipmaps:false,flipY:false}),sr=sxg.getImageData(0,0,512,640).data,sd=st.lock();for(let y=0;y<640;y++)sd.set(sr.subarray((639-y)*2048,(640-y)*2048),y*2048);st.unlock();const sm=mat('mottoPhoto','#ffffff');sm.diffuseMap=st;sm.opacityMap=st;sm.opacityMapChannel='a';sm.alphaTest=.2;sm.cull=pc.CULLFACE_BACK;sm.update();monument.quad(sm,[[-1.05,0,.56],[1.05,0,.56],[1.05,2.55,.56],[-1.05,2.55,.56]],[0,0,1,0,1,1,0,1]);
+const flowerPurple=mat('azaleaPurple','#a46b9c');for(let i=0;i<18;i++){const a=i*2.4,x=Math.cos(a)*1.8,z=-.6+Math.sin(a)*.8;monument.sphere(leaf,x,.32,z,.4,.35,.4);if(i%2===0)monument.sphere(flowerPurple,x,.6,z,.14,.08,.14)}
+worldLabel('꽃과 노래와 웃음이 있고 · 땀과 애태움이 있는 학교',monumentPoint[0],monumentPoint[2],'now',3.2);
+// The northwestern campus rear gate, with two open sculptural stone pillars.
+const backGatePoint=mapPoint(66,317),backGate=frame(backGatePoint[0],backGatePoint[2],224),gateConcrete=surface('rearGateConcrete','#c6c8c2','stone',2.2);
+backGate.box(asphalt,0,.25,-4,14,.24,43);for(const q of [-1,1]){backGate.box(paversRed,q*11,.24,-4,6,.26,43);backGate.box(curb,q*7.2,.35,-4,.28,.32,43)}
+for(let z=-23;z<14;z+=10){arrow(backGate,-3.4,z);arrow(backGate,3.4,z,1)}backGate.box(roadYellow,0,.38,-3,.15,.025,42);
+// Each pillar flares outward, with a curved opening and a split upper arm.
+for(const q of [-1,1])for(const depth of [-.72,.72]){const profile=[[0,0],[2.7,0],[1.6,3.5],[1.8,5.1],[2.5,6.4],[4.1,7.3],[6.9,8.1],[7.3,10],[3.8,9.1],[.7,8.8],[.25,6.4],[.7,3.6]];
+ const shape=profile.map(([x,y])=>[q*(8+x),y,depth]);for(let i=0;i<shape.length;i++){const a=shape[i],b=shape[(i+1)%shape.length];solidFace(backGate,gateConcrete,[[a[0],a[1],depth-.3],[b[0],b[1],depth-.3],[b[0],b[1],depth+.3],[a[0],a[1],depth+.3]])}
+ // Polygon surface with concave outline triangulated as a strip between outside and inside edges.
+ const outer=shape.slice(0,7),inner=[shape[0],shape[11],shape[10],shape[9],shape[8],shape[7],shape[6]];for(let j=0;j<6;j++)for(const dz of [-.31,.31])solidFace(backGate,gateConcrete,[[outer[j][0],outer[j][1],depth+dz],[outer[j+1][0],outer[j+1][1],depth+dz],[inner[j+1][0],inner[j+1][1],depth+dz],[inner[j][0],inner[j][1],depth+dz]]);
+}
+backGate.box(stone,19,1.7,-4,10,3.4,6);backGate.box(windowReflect,19,2.1,-.9,8.7,1.75,.1);backGate.box(roofDark,19,3.52,-3.7,11,.35,7);for(let x=15;x<24;x+=2)backGate.box(metal,x,2.1,-.8,.08,1.8,.1);
+backGate.box(stone,-20,1.8,0,10,3.6,1.4);wallText(backGate,'부산교육대학교',-20,2,.75,8,.7,'#333f44');
+for(let x=-7;x<8;x+=1.3)backGate.box(roadYellow,x,.39,7,.7,.03,3.6);
+const rearAnnexPoint=backGate.point(-31,0,-22),rearAnnex=frame(rearAnnexPoint[0],rearAnnexPoint[2],224);
+rearAnnex.box(stone,0,7.5,0,23,15,20);for(let x=-10;x<11;x+=2.2)rearAnnex.box([white,urbanSand,urbanBrick][Math.abs(Math.round(x))%3],x,10,10.1,.65,9,.13);for(let y of [2.5,6.5,10.5])for(let x=-9;x<10;x+=3)rearAnnex.box(windowReflect,x,y,10.2,2,1.7,.12);
+for(let z=-27;z<=-7;z+=5){backGate.sphere(stoneDark,-18,.65,z,1.3,.6,.8);backGate.sphere(leaf,-22,2.3,z,1.8,2,1.8);bareTree(backGate,-11,z,.9)}
+// Low industrial roofs and boundary wall visible across the road outside the rear gate.
+backGate.box(asphalt,0,.24,17,90,.24,11);backGate.box(urbanSand,0,1.9,26,85,3.8,.5);backGate.box(urbanPlaster,0,4,37,79,8,18);backGate.box(blueRoof,0,8.1,37,82,.25,20);
+for(let x=-35;x<36;x+=8)backGate.box(windowReflect,x,6.5,27.9,4,1.4,.12);
+worldLabel('부산교육대학교 후문',backGatePoint[0],backGatePoint[2],'now',11);
+// Muddy meadow occupying the identical school footprint in the past.
+const schoolMarsh=surface('schoolMarsh','#756c50','soil',3),wildGrass=mat('wildMeadow','#647546');
+const wetPatch=(x,z,rx,rz,m,y)=>{const pts=[];for(let k=0;k<24;k++){const a=k*Math.PI/12,r=1+.12*Math.sin(k*2.8),p=school.point(x+Math.cos(a)*rx*r,0,z+Math.sin(a)*rz*r);pts.push([p[0],p[2]])}poly(old,m,pts,y)};
+wetPatch(0,46,62,82,schoolMarsh,.13);wetPatch(-16,33,23,13,water,.17);wetPatch(21,70,18,29,water,.18);wetPatch(-28,94,17,16,water,.17);
+for(let i=0;i<510;i++){const x=-57+vr()*114,z=-24+vr()*150;if(((x+16)/24)**2+((z-33)/14)**2<1||((x-21)/19)**2+((z-70)/30)**2<1)continue;const p=school.point(x,0,z),h=.3+vr()*.8;for(let k=0;k<3;k++)box(old,k%2?reed:wildGrass,p[0]+k*.09,.15+h/2,p[2],.055,h,.08,(i*37+k*55)%180)}
+for(let i=0;i<16;i++){const p=school.point(-30+i*4,0,52+Math.sin(i)*2);ellipsoid(old,schoolMarsh,p[0],.21,p[2],1,.12,.65)}
+
 // Compile meshes once. Each era stays in memory for instant camera-preserving switching.
 for(const b of buckets.values()){const mesh=new pc.Mesh(device);mesh.setPositions(b.p);mesh.setNormals(b.n);mesh.setUvs(0,b.u);mesh.setIndices(b.i);mesh.update(pc.PRIMITIVE_TRIANGLES);const ent=new pc.Entity(b.material.name);ent.addComponent('render',{meshInstances:[new pc.MeshInstance(mesh,b.material)],castShadows:!['water','ripple','grass','paddy','contactAO','pavers','concrete','soil','asphalt','lines'].includes(b.material.name),receiveShadows:true});b.parent.addChild(ent)}buckets.clear();
 let era='now',showLabels=true;let firstPerson=false,isNight=false,runToggle=false;const walker={y:0,vy:0,grounded:true,step:0};let yaw=25,pitch=43,distance=285,target=new pc.Vec3(...school.point(0,0,32));let desired={yaw,pitch,distance,x:target.x,z:target.z};
 function toast(s){$('toast').textContent=s;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',2300)}
-function setEra(e){closeSpeech();era=e;now.enabled=e==='now';old.enabled=e==='old';$('past').classList.toggle('active',e==='old');$('present').classList.toggle('active',e==='now');$('past').setAttribute('aria-pressed',e==='old');$('present').setAttribute('aria-pressed',e==='now');$('eraTitle').textContent=e==='old'?'황새가 찾아오던 한새벌':'오늘날의 우리 동네';$('eraText').innerHTML=e==='old'?'논과 들, 물이 고인 습지와<br>초가가 모여 있는 옛날의 풍경':'학교와 대학, 집과 도로가<br>모여 있는 오늘날의 풍경';applyLighting();walker.y=walkHeight(desired.x,desired.z);walker.vy=0}
+function setEra(e){closeSpeech();era=e;document.querySelectorAll('.sceneTabs button').forEach(b=>{b.classList.remove('active');b.setAttribute('aria-pressed','false')});now.enabled=e==='now';old.enabled=e==='old';$('past').classList.toggle('active',e==='old');$('present').classList.toggle('active',e==='now');$('past').setAttribute('aria-pressed',e==='old');$('present').setAttribute('aria-pressed',e==='now');$('eraTitle').textContent=e==='old'?'황새가 찾아오던 한새벌':'오늘날의 우리 동네';$('eraText').innerHTML=e==='old'?'논과 들, 물이 고인 습지와<br>초가가 모여 있는 옛날의 풍경':'학교와 대학, 집과 도로가<br>모여 있는 오늘날의 풍경';applyLighting();walker.y=walkHeight(desired.x,desired.z);walker.vy=0}
 $('past').onclick=()=>setEra('old');$('present').onclick=()=>setEra('now');const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));function zoom(f){desired.distance=clamp(desired.distance*f,8,2700)}$('zoomIn').onclick=()=>zoom(.78);$('zoomOut').onclick=()=>zoom(1.28);$('home').onclick=()=>Object.assign(desired,{yaw:0,pitch:53,distance:990,x:0,z:65});$('school').onclick=()=>{Object.assign(desired,{x:school.point(0,0,46)[0],z:school.point(0,0,46)[2],distance:240,pitch:43,yaw:25});toast(era==='old'?'지금 우리 학교가 있는 자리입니다':'우리 학교를 가까이 살펴보세요')};$('top').onclick=()=>{desired.pitch=85;desired.yaw=0};$('names').onclick=()=>{showLabels=!showLabels;$('names').textContent=showLabels?'설명 숨김':'설명 보기';$('names').setAttribute('aria-pressed',showLabels)};$('full').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch(e){toast('전체 화면은 F11 키로도 볼 수 있습니다')}};
 let selectedPerson=null,meetingIndex={now:0,old:0};
 function closeSpeech(){selectedPerson=null;$('speech').hidden=true}
 function openSpeech(p){selectedPerson=p;p.line=0;$('speaker').textContent=p.name;$('speechText').textContent=p.talk[0];$('speech').hidden=false;if(firstPerson){document.exitPointerLock?.();return}Object.assign(desired,{x:p.entity.getPosition().x,z:p.entity.getPosition().z,distance:32,pitch:18,yaw:p.era==='now'?schoolAngle:p.angle+155});}
 $('speechClose').onclick=closeSpeech;$('speechNext').onclick=()=>{if(!selectedPerson)return;selectedPerson.line=(selectedPerson.line+1)%selectedPerson.talk.length;$('speechText').textContent=selectedPerson.talk[selectedPerson.line]};
 $('meetPeople').onclick=()=>{const list=people.filter(p=>p.era===era);openSpeech(list[meetingIndex[era]%list.length]);meetingIndex[era]++};
-$('magpies').onclick=()=>{closeSpeech();if(era!=='now')setEra('now');const p=school.point(0,0,28);Object.assign(desired,{x:p[0],z:p[2],distance:36,pitch:30,yaw:0})};
+$('magpies').onclick=()=>{closeSpeech();const p=school.point(0,0,28);Object.assign(desired,{x:p[0],z:p[2],distance:36,pitch:30,yaw:0})};
 $('college').onclick=()=>{closeSpeech();Object.assign(desired,{x:32,z:180,distance:660,pitch:53,yaw:43})};
 $('compare').onclick=()=>$('comparison').showModal();$('closeCompare').onclick=()=>$('comparison').close();
 
-function animatePeople(dt,time){for(let p of people){if(p.era!==era)continue;const t=time+p.phase;const walk=p.activity==='walk',play=p.activity==='play',wave=p.activity==='wave',farm=p.activity==='farm';let step=p.activity==='wade'?Math.sin(t*.7)*8:walk?Math.sin(t*3.3)*22:play?Math.sin(t*3)*12:0;for(let i=0;i<2;i++){p.legs[i].setLocalEulerAngles((i?1:-1)*step,0,0);p.arms[i].setLocalEulerAngles((i?-1:1)*step,0,wave&&i===1?125+Math.sin(t*3)*13:(i?1:-1)*(play?35+Math.sin(t*2)*18:7))}if(p.activity==='wade')p.entity.setPosition(p.x+Math.sin(t*.35)*.12,-.1,p.z+Math.cos(t*.35)*.12);if(walk){p.entity.setPosition(p.x+Math.sin(t*.45)*1.2,0,p.z+Math.cos(t*.45)*.9)}p.group.setLocalEulerAngles(farm?13+Math.sin(t*1.8)*10:0,0,0);p.group.setLocalPosition(0,play?Math.abs(Math.sin(t*2))*.07:0,0)}if(era==='now')ballRoot.setPosition(ballPoint[0]+Math.sin(time*1.3)*1.1,.1+Math.abs(Math.sin(time*2.6))*.45,ballPoint[2])}
+function animatePeople(dt,time){for(let p of people){if(p.era!==era)continue;const t=time+p.phase;const walk=p.activity==='walk',play=p.activity==='play',wave=p.activity==='wave',farm=p.activity==='farm';let step=p.activity==='wade'?Math.sin(t*.7)*8:walk?Math.sin(t*3.3)*22:play?Math.sin(t*3)*12:0;for(let i=0;i<2;i++){p.legs[i].setLocalEulerAngles((i?1:-1)*step,0,0);p.arms[i].setLocalEulerAngles((i?-1:1)*step,0,wave&&i===1?125+Math.sin(t*3)*13:(i?1:-1)*(play?35+Math.sin(t*2)*18:7))}if(p.activity==='wade')p.entity.setPosition(p.x+Math.sin(t*.35)*.12,-.1,p.z+Math.cos(t*.35)*.12);if(walk){p.entity.setPosition(p.x+Math.sin(t*.45)*1.2,0,p.z+Math.cos(t*.45)*.9)}p.group.setLocalEulerAngles(farm?-13-Math.sin(t*1.8)*10:0,0,0);p.group.setLocalPosition(0,play?Math.abs(Math.sin(t*2))*.07:0,0)}if(era==='now')ballRoot.setPosition(ballPoint[0]+Math.sin(time*1.3)*1.1,.1+Math.abs(Math.sin(time*2.6))*.45,ballPoint[2])}
 const personScreen=new pc.Vec3();
 function updatePeoplePins(){const cw=canvas.clientWidth||innerWidth,ch=canvas.clientHeight||innerHeight;for(let p of people){let pos=p.entity.getPosition();p.pos.set(pos.x,pos.y+p.height+.3,pos.z);camera.camera.worldToScreen(p.pos,personScreen);let active=p.era===era&&personScreen.z>0&&personScreen.x>5&&personScreen.x<cw-85&&personScreen.y>150&&personScreen.y<ch-110; // Filter distant clusters to keep the aerial view readable.
 if(!firstPerson&&distance>350){const preferred=era==='now'?[0,5,6,7]:[8,9,13];active=active&&preferred.includes(people.indexOf(p))}if(active){p.pin.style.display='block';p.pin.style.left=personScreen.x+'px';p.pin.style.top=personScreen.y+'px'}else p.pin.style.display='none'}}
@@ -779,7 +850,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)setTeleport
 
 // Kinematic first person walking uses the same terrain in both eras.
 function schoolLocal(x,z){const a=schoolAngle*Math.PI/180,dx=x-schoolOrigin.x,dz=z-schoolOrigin.z;return {x:dx*Math.cos(a)-dz*Math.sin(a),z:dx*Math.sin(a)+dz*Math.cos(a)}}
-function walkHeight(x,z){let h=Math.max(0,hillHeight(x,z));if(era==='now'){h=Math.max(h,.42);const p=schoolLocal(x,z);if(p.x>=-13.5&&p.x<=16.3&&p.z>=87.45&&p.z<=93.82){const k=Math.max(0,Math.min(10,Math.floor((p.z-87.49)/.57)));h=Math.max(h,.5+k*.28)}if(p.x>=-13.5&&p.x<=16.3&&p.z>93.4&&p.z<104)h=Math.max(h,3.3)}else if(x>-354&&x<-316&&z>-91&&z<-60)h=Math.max(h,.64);return h}
+function walkHeight(x,z){let h=Math.max(0,hillHeight(x,z));if(era==='now'){h=Math.max(h,.42);const ka=(schoolAngle+90)*Math.PI/180,kx=(x-kp[0])*Math.cos(ka)-(z-kp[2])*Math.sin(ka),kz=(x-kp[0])*Math.sin(ka)+(z-kp[2])*Math.cos(ka);if(kx>-19.5&&kx<-12.5&&kz>=12&&kz<=26.4)h=Math.max(h,.22+Math.min(25,Math.max(0,Math.floor((26.27-kz)/.55)))*.19);if(kx>-19.5&&kx<-12.5&&kz>9.2&&kz<12)h=Math.max(h,5.03);const p=schoolLocal(x,z);if(p.x>=-13.5&&p.x<=16.3&&p.z>=87.45&&p.z<=93.82){const k=Math.max(0,Math.min(10,Math.floor((p.z-87.49)/.57)));h=Math.max(h,.5+k*.28)}if(p.x>=-13.5&&p.x<=16.3&&p.z>93.4&&p.z<104)h=Math.max(h,3.3)}else if(x>-354&&x<-316&&z>-91&&z<-60)h=Math.max(h,.64);return h}
 function blocked(x,z){for(const b of solidBoxes){if(b.era!=='both'&&b.era!==era)continue;if(walker.y+1.55<b.y-b.h/2||walker.y+.28>b.y+b.h/2)continue;const a=b.angle*Math.PI/180,dx=x-b.x,dz=z-b.z,lx=dx*Math.cos(a)-dz*Math.sin(a),lz=dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(lx)<b.w/2+.25&&Math.abs(lz)<b.d/2+.25)return true}return false}
 function keyboardMove(dt){if(!firstPerson){orbitKeyboardMove(dt);return}if(document.querySelector('dialog[open]')){heldKeys.clear();touchKeys.clear();return}dt=Math.min(dt,.05);const down=(...keys)=>keys.some(k=>heldKeys.has(k)||touchKeys.has(k)),forward=Number(down('KeyW','ArrowUp'))-Number(down('KeyS','ArrowDown')),right=Number(down('KeyD','ArrowRight'))-Number(down('KeyA','ArrowLeft')),len=Math.hypot(forward,right)||1,speed=(down('ShiftLeft','ShiftRight')||runToggle?8.5:4.3)*dt,a=desired.yaw*Math.PI/180,dx=(-Math.sin(a)*forward+Math.cos(a)*right)*speed/len,dz=(-Math.cos(a)*forward-Math.sin(a)*right)*speed/len;
  function axis(x,z){const g=walkHeight(x,z);if(g-walker.y>.36||blocked(x,z))return false;desired.x=x;desired.z=z;return true}
@@ -805,6 +876,10 @@ const activities=document.createElement('select');activities.id='activityVisit';
 document.querySelector('.meet').append(activities);
 activities.onchange=()=>{const key=activities.value;if(!key)return;let p,heading;if(key==='entrance'){setEra('now');p=gateStreet.point(0,0,6);heading=262}else if(key==='stairs'){setEra('now');p=school.point(6,0,83);heading=schoolAngle+180}else if(key==='bamboo'){setEra('now');p=[...schoolPath[0]];p=[p[0],0,p[1]];heading=Math.atan2(p[0]-schoolPath[1][0],p[2]-schoolPath[1][1])*180/Math.PI}else if(key==='dure'){setEra('old');p=[-326,0,-59];heading=0}else{setEra('old');p=[playCentre.x+3,0,playCentre.z+25];heading=0}desired.x=p[0];desired.z=p[2];desired.yaw=heading;setFirstPerson(true);activities.value=''};
 
+// Dedicated, repeatable scene shortcuts. Each switches era and takes the viewer close to people.
+function visitScene(key){closeSpeech();setTeleportArmed(false);const specs={oldPlay:{era:'old',p:[playCentre.x+3,0,playCentre.z+25],yaw:0},nowPlay:{era:'now',p:school.point(9,0,57),yaw:schoolAngle},oldWork:{era:'old',p:[-333,0,-89],yaw:180},court:{era:'now',p:civic.point(3,0,51),yaw:43},rear:{era:'now',p:backGate.point(0,0,19),yaw:224},stone:{era:'now',p:monument.point(0,0,5),yaw:schoolAngle},hall:{era:'now',p:kkachi.point(0,0,44),yaw:schoolAngle+90}};const v=specs[key];if(!v)return;setEra(v.era);desired.x=v.p[0];desired.z=v.p[2];desired.yaw=v.yaw;setFirstPerson(true);if(key==='stone'){desired.pitch=7;placeFirstPerson()}document.querySelectorAll('.sceneTabs button').forEach(b=>{b.classList.toggle('active',b.id===key);b.setAttribute('aria-pressed',String(b.id===key))});toast('도착했어요. 친구나 사람의 말풍선을 누르면 이야기할 수 있어요.');}
+for(const id of ['oldPlay','nowPlay','oldWork'])$(id).onclick=()=>visitScene(id);
+const photoVisits=document.createElement('select');photoVisits.id='photoVisit';photoVisits.setAttribute('aria-label','새로 살펴볼 장소');photoVisits.innerHTML='<option value="">장소 바로 보기</option><option value="hall">까치관과 계단</option><option value="stone">학교 교훈석</option><option value="rear">부산교대 후문</option><option value="court">법원 직원 만나기</option>';document.querySelector('.meet').append(photoVisits);photoVisits.onchange=()=>{visitScene(photoVisits.value);photoVisits.value=''};
 const screen=new pc.Vec3();let lastLabels=0;let animationTime=0;app.on('update',dt=>{keyboardMove(dt);animationTime+=dt;animatePeople(dt,animationTime);animateMagpies(animationTime);animateWell(animationTime);animateVillage(animationTime);updateNightLights();let f=1-Math.exp(-dt*10);yaw+=(desired.yaw-yaw)*f;pitch+=(desired.pitch-pitch)*f;distance+=(desired.distance-distance)*f;target.x+=(desired.x-target.x)*f;target.z+=(desired.z-target.z)*f;target.y+=(Math.max(0,hillHeight(target.x,target.z))-target.y)*f;const a=yaw*Math.PI/180,b=pitch*Math.PI/180;camera.setPosition(target.x+distance*Math.cos(b)*Math.sin(a),target.y+distance*Math.sin(b),target.z+distance*Math.cos(b)*Math.cos(a));camera.lookAt(target);if(firstPerson)placeFirstPerson();$('north').style.transform=`rotate(${-yaw}deg)`;lastLabels+=dt;if(lastLabels>.05){lastLabels=0;updatePeoplePins();const occupied=[];for(let l of [...labels].sort((a,b)=>a.pos.distance(target)-b.pos.distance(target))){camera.camera.worldToScreen(l.pos,screen);const width=Math.min(260,l.el.textContent.length*12+20);let visible=showLabels&&l.era===era&&screen.z>0&&screen.x>width/2+12&&screen.x<innerWidth-width/2-110&&screen.y>190&&screen.y<innerHeight-140&&!occupied.some(r=>Math.abs(r.x-screen.x)<(r.w+width)/2+6&&Math.abs(r.y-screen.y)<36);l.el.style.display=visible?'block':'none';if(visible){occupied.push({x:screen.x,y:screen.y,w:width});l.el.style.left=screen.x+'px';l.el.style.top=screen.y+'px'}}}});
 // Useful fixed views make individual buildings inspectable on a touch screen.
 const buildingStops=[['학교 앞쪽',school,0,6,110,43],['벽화 쪽',gaenari,0,10,75,133],['파란 건물 쪽',parang,0,10,85,133],['학교 뒤쪽',kkachi,0,21,82,133],['옆 건물 쪽',songjuk,0,10,80,-47],['잔디 마당',school,0,39,160,25],['모래 마당',school,-2,74,110,43]];
@@ -818,5 +893,5 @@ const nearby=document.createElement('select');nearby.id='nearbyVisit';nearby.set
 cityButton.onclick=()=>{if(firstPerson)setFirstPerson(false);closeSpeech();Object.assign(desired,{x:180,z:220,distance:1300,pitch:58,yaw:43})};
 
 const campusVisit=document.createElement('select');campusVisit.id='campusVisit';campusVisit.setAttribute('aria-label','대학과 길 자세히 보기');campusVisit.innerHTML='<option value="">대학과 길 자세히 보기</option>'+Object.entries(detailStops).map(([key,p])=>`<option value="${key}">${p.name}</option>`).join('');document.querySelector('.meet').append(campusVisit);campusVisit.onchange=()=>{if(firstPerson)setFirstPerson(false);const stop=detailStops[campusVisit.value];if(!stop)return;closeSpeech();setEra('now');Object.assign(desired,stop);campusVisit.value='';toast(stop.name+'을 살펴보세요')};
-app.start();$('loading').classList.add('hidden');window.timeTravel={app,setEra,setFirstPerson,teleportToScreen,setTeleportArmed,jump,walkHeight,visit:(x,z)=>{desired.x=x;desired.z=z;walker.y=walkHeight(x,z);walker.vy=0},getState:()=>({era,device:device.deviceType,desired:{...desired},meshes:now.children.length+old.children.length,people:people.length,terrainShared:shared.enabled!==false,schoolLayout:{yard:yardSpec,kkachiFacing:schoolAngle+90,main:school.point(0,0,0),kkachi:kp,parang:bp,songjuk:sp,playground:school.point(0,0,43)},graphicsRevision:'photo-corrections-and-drag-r7',nightAmbient:app.scene.ambientLight.toString(),crestSource:'user-photo',songjukFacade:'blue-orange-yellow-green',starCount:180,vegetationRevision:'pine-branch-needles-and-bamboo-lance-leaves',firstPerson,isNight,walker:{...walker},nightLights:lampPositions.length,dureWorkers:dureWorkers.length,schoolPath,muralWall:school.point(23,0,94),terraceStairBounds:{minX:-13.5,maxX:16.3},playCentre,teleportArmed,wellHuts,mapAnchors,riverRoute,trainees:trainees.length,universityBuildings,detailStops,campusRoute,textOrientation:'bottom-up RGBA with outward-only faces',contextSites,characterStyle:'block',magpies:magpies.length,wellLocation:{x:wellX,z:wellZ},dykeLocation:{x:dykeX,z:dykeZ},textureUpload:'ImageBitmap'})};
+app.start();$('loading').classList.add('hidden');window.timeTravel={app,visitScene,setEra,setFirstPerson,teleportToScreen,setTeleportArmed,jump,walkHeight,visit:(x,z)=>{desired.x=x;desired.z=z;walker.y=walkHeight(x,z);walker.vy=0},getState:()=>({era,device:device.deviceType,desired:{...desired},meshes:now.children.length+old.children.length,people:people.length,terrainShared:shared.enabled!==false,schoolLayout:{yard:yardSpec,kkachiFacing:schoolAngle+90,main:school.point(0,0,0),kkachi:kp,parang:bp,songjuk:sp,playground:school.point(0,0,43)},graphicsRevision:'school-scenes-r8',trafficSide:'right',rearGateLocation:backGatePoint,monumentLocation:monumentPoint,durePoses:dureWorkers.map(p=>({pose:p.workPose,bend:p.group.getLocalEulerAngles().x,talk:p.talk[0]})),nightAmbient:app.scene.ambientLight.toString(),crestSource:'user-photo',songjukFacade:'blue-orange-yellow-green',starCount:180,vegetationRevision:'simple-open-jointed-bamboo',firstPerson,isNight,walker:{...walker},nightLights:lampPositions.length,dureWorkers:dureWorkers.length,schoolPath,muralWall:school.point(23,0,94),terraceStairBounds:{minX:-13.5,maxX:16.3},playCentre,teleportArmed,wellHuts,mapAnchors,riverRoute,trainees:trainees.length,universityBuildings,detailStops,campusRoute,textOrientation:'bottom-up RGBA with outward-only faces',contextSites,characterStyle:'block',magpies:magpies.length,wellLocation:{x:wellX,z:wellZ},dykeLocation:{x:dykeX,z:dykeZ},textureUpload:'ImageBitmap'})};
 }
