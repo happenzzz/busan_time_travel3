@@ -14,14 +14,15 @@ const camera=new pc.Entity('camera');camera.addComponent('camera',{clearColor:ne
 const sun=new pc.Entity('sun');sun.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.87),intensity:1.5,castShadows:true,shadowDistance:900,shadowResolution:2048,shadowBias:.045,normalOffsetBias:.12,numCascades:3});sun.setEulerAngles(52,-35,0);app.root.addChild(sun);
 const now=new pc.Entity('today'),old=new pc.Entity('past'),shared=new pc.Entity('landscape');app.root.addChild(now);app.root.addChild(old);app.root.addChild(shared);old.enabled=false;
 let seed=819;function rnd(){seed=(1664525*seed+1013904223)>>>0;return seed/4294967296}const rand=(a,b)=>a+rnd()*(b-a);function col(hex){return new pc.Color().fromString(hex)}
-const mats={};function mat(name,color,gloss=5){let m=new pc.StandardMaterial();m.name=name;m.diffuse=col(color);m.gloss=gloss/100;m.specular=new pc.Color(.16,.16,.16);m.update();mats[name]=m;return m}
+const lampPositions=[];const mats={};function mat(name,color,gloss=5){let m=new pc.StandardMaterial();m.name=name;m.diffuse=col(color);m.gloss=gloss/100;m.specular=new pc.Color(.16,.16,.16);m.update();mats[name]=m;return m}
 const grass=mat('grass','#6c7d47'),soil=mat('soil','#998565'),asphalt=mat('asphalt','#596063'),walk=mat('concrete','#b1aea2'),white=mat('white','#e2dfcc'),wall=mat('wall','#d4cfbd'),roof=mat('roof','#67928b'),glass=mat('glass','#577b88',75),dark=mat('dark','#343f3e'),wood=mat('wood','#67513a'),leaf=mat('leaf','#466440'),leaf2=mat('leaf2','#607844'),reed=mat('reed','#8b944f'),water=mat('water','#6c9995',90),thatch=mat('thatch','#9d895a'),mud=mat('mud','#c1ad85'),black=mat('black','#272c29'),red=mat('red','#ad4c36'),lines=mat('lines','#e8e5d6'),paddy=mat('paddy','#768c49');water.metalness=.25;water.useMetalness=true;water.update();
 // Material atlases supply fine surface detail without local image loading restrictions.
 function texture(material,kind){const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.fillStyle=material.diffuse.toString(false);x.fillRect(0,0,256,256);for(let i=0;i<6500;i++){let v=Math.floor(rand(75,205));x.fillStyle=`rgba(${v},${v},${v},${rand(.04,.20)})`;x.fillRect(rand(0,256),rand(0,256),rand(1,4),rand(1,4))}if(kind==='grass'){for(let i=0;i<1200;i++){x.strokeStyle=rnd()<.5?'#83945570':'#42533380';x.beginPath();let a=rand(0,256),b=rand(0,256);x.moveTo(a,b);x.lineTo(a+rand(-3,3),b-rand(2,8));x.stroke()}}if(kind==='roof'){x.strokeStyle='#32453c66';for(let i=0;i<256;i+=12){x.fillStyle='#c7d6bc28';x.fillRect(i,0,3,256);x.fillStyle='#203b3745';x.fillRect(i+4,0,1,256)}}if(kind==='thatch'){for(let i=0;i<900;i++){x.strokeStyle=rnd()<.5?'#d1ba7a90':'#604d2c70';x.beginPath();let a=rand(0,256),b=rand(0,256);x.moveTo(a,b);x.lineTo(a+rand(-7,7),b+rand(8,45));x.stroke()}}const t=new pc.Texture(device,{width:256,height:256,mipmaps:true});t.setSource(c);material.diffuseMap=t;material.diffuse.set(1,1,1);material.update()}
 texture(grass,'grass');texture(soil,'soil');texture(asphalt,'soil');texture(roof,'roof');texture(thatch,'thatch');texture(mud,'soil');texture(paddy,'grass');
 // Aggregate static geometry per material and era to keep draw calls modest.
+const solidBoxes=[];let collectSolids=true;
 const buckets=new Map();function geom(parent,material,pos,norm,uv,idx){const k=parent.name+material.name;let b=buckets.get(k);if(!b){b={parent,material,p:[],n:[],u:[],i:[]};buckets.set(k,b)}const off=b.p.length/3;b.p.push(...pos);b.n.push(...norm);b.u.push(...uv);for(const n of idx)b.i.push(n+off)}
-function box(parent,m,x,y,z,w,h,d,angle=0){let p=[],n=[],u=[],i=[];let a=angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);const faces=[[[1,0,0],[[1,-1,-1],[1,1,-1],[1,1,1],[1,-1,1]]],[[-1,0,0],[[-1,-1,1],[-1,1,1],[-1,1,-1],[-1,-1,-1]]],[[0,1,0],[[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]]],[[0,-1,0],[[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]]],[[0,0,1],[[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]],[[0,0,-1],[[1,-1,-1],[-1,-1,-1],[-1,1,-1],[1,1,-1]]]];for(const [normal,verts]of faces){let off=p.length/3;for(let j=0;j<4;j++){let v=verts[j],vx=v[0]*w/2,vz=v[2]*d/2;p.push(x+vx*ca+vz*sa,y+v[1]*h/2,z-vx*sa+vz*ca);n.push(normal[0]*ca+normal[2]*sa,normal[1],-normal[0]*sa+normal[2]*ca);{const faceU=normal[0]?d:w,faceV=normal[1]?d:h,sc=m._meterScale||0,uv=[[0,0],[1,0],[1,1],[0,1]][j];u.push(uv[0]*(sc?faceU/sc:1),uv[1]*(sc?faceV/sc:1))}}i.push(off,off+1,off+2,off,off+2,off+3)}geom(parent,m,p,n,u,i)}
+function box(parent,m,x,y,z,w,h,d,angle=0){if(collectSolids && h>2.5 && w>2.5 && d>2.5 && y-h/2<4 && ![grass,soil,water,paddy,thatch,leaf,leaf2].includes(m))solidBoxes.push({era:parent===now?'now':parent===old?'old':'both',x,z,y,w,h,d,angle});let p=[],n=[],u=[],i=[];let a=angle*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);const faces=[[[1,0,0],[[1,-1,-1],[1,1,-1],[1,1,1],[1,-1,1]]],[[-1,0,0],[[-1,-1,1],[-1,1,1],[-1,1,-1],[-1,-1,-1]]],[[0,1,0],[[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]]],[[0,-1,0],[[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]]],[[0,0,1],[[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]],[[0,0,-1],[[1,-1,-1],[-1,-1,-1],[-1,1,-1],[1,1,-1]]]];for(const [normal,verts]of faces){let off=p.length/3;for(let j=0;j<4;j++){let v=verts[j],vx=v[0]*w/2,vz=v[2]*d/2;p.push(x+vx*ca+vz*sa,y+v[1]*h/2,z-vx*sa+vz*ca);n.push(normal[0]*ca+normal[2]*sa,normal[1],-normal[0]*sa+normal[2]*ca);{const faceU=normal[0]?d:w,faceV=normal[1]?d:h,sc=m._meterScale||0,uv=[[0,0],[1,0],[1,1],[0,1]][j];u.push(uv[0]*(sc?faceU/sc:1),uv[1]*(sc?faceV/sc:1))}}i.push(off,off+1,off+2,off,off+2,off+3)}geom(parent,m,p,n,u,i)}
 function ellipsoid(parent,m,x,y,z,rx,ry,rz,segments=10,rings=6){let p=[],n=[],u=[],idx=[];for(let j=0;j<=rings;j++)for(let i=0;i<=segments;i++){const a=i/segments*Math.PI*2,b=j/rings*Math.PI;let nx=Math.sin(b)*Math.cos(a),ny=Math.cos(b),nz=Math.sin(b)*Math.sin(a);p.push(x+rx*nx,y+ry*ny,z+rz*nz);const len=Math.hypot(nx/rx,ny/ry,nz/rz);n.push(nx/rx/len,ny/ry/len,nz/rz/len);u.push(i/segments,j/rings)}for(let j=0;j<rings;j++)for(let i=0;i<segments;i++){let a=j*(segments+1)+i,b=a+segments+1;idx.push(a,a+1,b,b,a+1,b+1)}geom(parent,m,p,n,u,idx)}
 function segment(parent,m,a,b,width,height=.16){let dx=b[0]-a[0],dz=b[1]-a[1];box(parent,m,(a[0]+b[0])/2,height/2+.08,(a[1]+b[1])/2,width,height,Math.hypot(dx,dz),Math.atan2(dx,dz)*180/Math.PI)}
 function poly(parent,m,pts,y=.05){let p=[],n=[],u=[],idx=[];for(const [x,z]of pts){p.push(x,y,z);n.push(0,1,0);u.push(x/32,z/32)}for(let j=1;j<pts.length-1;j++)idx.push(0,j+1,j);geom(parent,m,p,n,u,idx)}
@@ -44,7 +45,7 @@ function contact(x,z,w,d,angle=0,y=.15){const a=angle*Math.PI/180,c=Math.cos(a),
 grass._meterScale=14;soil._meterScale=18;asphalt._meterScale=8;roof._meterScale=9;
 // Dappled, directional leaf clusters instead of a single flat foliage colour.
 for(const [m,base]of [[leaf,'#466745'],[leaf2,'#698050']]){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle=base;g.fillRect(0,0,256,256);for(let i=0;i<1800;i++){g.save();g.translate(rand(0,256),rand(0,256));g.rotate(rand(0,6.28));g.fillStyle=['#b8c17b55','#253e3470','#76975866','#8ca95c80'][i%4];g.beginPath();g.ellipse(0,0,rand(1.2,4),rand(2,7),0,0,6.283);g.fill();g.restore()}const t=new pc.Texture(device,{width:256,height:256,mipmaps:true});t.setSource(c);m.diffuseMap=t;m.diffuse.set(1,1,1);m.update()}
-function tree(parent,x,z,s=1){
+function tree(parent,x,z,s=1){if(parent===now&&pathDistance(x,z,bambooRouteWorld)<7)return;
  box(parent,wood,x,2.5*s,z,.38*s,5*s,.38*s);
  const variants=[leaf,leaf2],main=variants[rnd()<.5?0:1];
  // Irregular clumped crowns with smaller edge foliage retain tree silhouettes at aerial scale.
@@ -55,6 +56,7 @@ function tree(parent,x,z,s=1){
 const X=u=>(u-619)*.85,Z=v=>(v-460)*.85;
 function mapPoint(u,v){return [32+(u-565)*.46,0,130+(v-485)*.46]}
 const mapAnchors={school:[375,833],hall:[354,756],field:[566,491],island:[765,789],museum:[1001,759],sculpture:[962,539],gate:[1193,625],well:[1280,380]};
+const bambooRouteWorld=(()=>{const o=mapPoint(375,833),a=43*Math.PI/180,pt=(x,z)=>[o[0]+x*Math.cos(a)+z*Math.sin(a),o[2]-x*Math.sin(a)+z*Math.cos(a)],r=mapPoint(765,789);const A=pt(50,66),B=pt(54,43),C=[r[0]-47,r[2]+32],D=[r[0]-10,r[2]+5];return Array.from({length:25},(_,i)=>{const t=i/24,u=1-t;return[0,1].map(k=>u*u*u*A[k]+3*u*u*t*B[k]+3*u*t*t*C[k]+t*t*t*D[k])})})();
 const riverRoute=[[827,-450],[849,-240],[858,-80],[861,110],[875,270],[904,445],[963,625],[1034,820]];
 
 box(shared,grass,0,-2,100,3800,4,3300);
@@ -95,7 +97,7 @@ function nearRoad(u,v,r){const x=X(u),z=Z(v);return roadNetwork.some(([pts,w])=>
 // Neighbourhood blocks follow the street density of the reference, outside the campus.
 function reservedRoute(x,z){const pts=[[321,194],[410,205],[535,222],[650,246]];return pts.slice(1).some((b,i)=>{const a=pts[i],dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));return Math.hypot(x-a[0]-dx*t,z-a[1]-dz*t)<35})}
 function reservedCampus(x,z){return inside(x,z,[[0,310],[427,-100],[1105,453],[1193,625],[760,1120],[270,1020],[-100,590]].map(([u,v])=>{const a=mapPoint(u,v);return[a[0],a[2]]}))}
-function reservedContext(x,z){return reservedCampus(x,z)||reservedRoute(x,z)||(x>162&&x<542&&z>285&&z<719)||(x>-425&&x<-260&&z>-280&&z<-110)||Math.hypot(x-585,z-210)<55||Math.hypot(x-361,z-82)<18}
+function reservedContext(x,z){return reservedCampus(x,z)||reservedRoute(x,z)||(x>162&&x<542&&z>285&&z<719)||(x>-425&&x<-260&&z>-280&&z<-110)||(Math.hypot(x-585,z-210)<55||Math.hypot(x-405,z-156)<35)||Math.hypot(x-361,z-82)<18}
 function inSchoolArea(x,z){const o=mapPoint(375,833),dx=x-o[0],dz=z-o[2],a=43*Math.PI/180,lx=dx*Math.cos(a)-dz*Math.sin(a),lz=dx*Math.sin(a)+dz*Math.cos(a);return lx>-80&&lx<86&&lz>-65&&lz<128}
 
 function inside(x,y,vs){let c=false;for(let i=0,j=vs.length-1;i<vs.length;j=i++){let a=vs[i],b=vs[j];if(((a[1]>y)!=(b[1]>y))&&(x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0]))c=!c}return c}
@@ -119,7 +121,7 @@ label('부산교육대학교',605,468,23,'now');
 // Older landscape: wet lowland, winding channels, cultivated plots and a small village.
 poly(old,water,[[-260,-220],[-110,-240],[25,-184],[110,-75],[76,58],[161,140],[142,215],[46,247],[-83,215],[-110,92],[-177,4],[-227,-90]],.15);
 
-for(let j=0;j<8;j++)for(let i=0;i<5;i++){let x=-445+i*55,z=-350+j*69;if(x>-235&&z<240)continue;box(old,soil,x,.26,z,51,.5,64);box(old,rnd()<.5?paddy:water,x,.53,z,47,.12,59);for(let r=0;r<11;r++)box(old,paddy,x-21+r*4.1,.66,z,1,.3,57)}
+for(let j=0;j<8;j++)for(let i=0;i<5;i++){let x=-445+i*55,z=-350+j*69;if(x>-235&&z<240||i===2&&j===4)continue;box(old,soil,x,.26,z,51,.5,64);box(old,rnd()<.5?paddy:water,x,.53,z,47,.12,59);for(let r=0;r<11;r++)box(old,paddy,x-21+r*4.1,.66,z,1,.3,57)}
 for(let j=0;j<6;j++)for(let i=0;i<4;i++){let x=275+i*47,z=-250+j*61;const wp=mapPoint(...mapAnchors.well);if(Math.hypot(x-wp[0],z-wp[2])<55)continue;box(old,soil,x,.25,z,44,.5,57);box(old,paddy,x,.55,z,41,.16,54);for(let r=0;r<9;r++)box(old,reed,x-18+r*4.4,.8,z,.5,.4,53)}
 for(let i=0;i<35;i++){let z=-390+i*23,x=-270+Math.sin(i*.14)*42;segment(old,soil,[x,z],[ -270+Math.sin((i+1)*.14)*42,z+23],4.5,.17)}
 function hut(x,z,w,d){box(old,mud,x,2,z,w,4,d);box(old,wood,x,1.5,z+d/2+.03,1.5,3,.1);box(old,dark,x-w*.3,2.1,z+d/2+.06,1.1,1.2,.1); // Sloped thatch, rounded eaves and ridge.
@@ -165,10 +167,31 @@ school.box(pavers,0,.30,10.5,87,.16,5.5);school.box(pavers,-44,.30,38,5,.16,53);
 school.box(stone,-46,.98,38,1.1,1.96,54);school.box(grass,-49,1.95,38,5,.2,54);
 // Thin round steel tubes for the photographed climbing frames and railings.
 function tube(f,m,a,b,r=.06,sides=8){let aa=f.point(...a),bb=f.point(...b),axis=bb.map((v,i)=>v-aa[i]),len=Math.hypot(...axis);if(len<1e-6)return;axis=axis.map(v=>v/len);let helper=Math.abs(axis[1])<.95?[0,1,0]:[1,0,0],cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],u=cross(axis,helper),ul=Math.hypot(...u);u=u.map(v=>v/ul);let v=cross(axis,u),p=[],n=[],uv=[],idx=[];for(let j=0;j<=1;j++)for(let i=0;i<=sides;i++){const t=i/sides*Math.PI*2,nn=u.map((a,k)=>a*Math.cos(t)+v[k]*Math.sin(t));p.push(...aa.map((a,k)=>a+axis[k]*len*j+nn[k]*r));n.push(...nn);uv.push(i/sides,j)}for(let i=0;i<sides;i++){const a=i,b=i+sides+1;idx.push(a,a+1,b,a+1,b+1,b)}geom(now,m,p,n,uv,idx)}
-function photoPine(x,z,s=1){tube(school,wood,[x,.4,z],[x+.6*s,7.8*s,z],.24*s);for(let j=0;j<5;j++){let yy=(6.1+j*.63)*s,xx=x+(j%2?1.25:-.9)*s; tube(school,wood,[x+.4*s,yy-.8,z],[xx,yy,z+(j%3-1)*.8*s],.12*s);school.sphere(j%2?leaf:leaf2,xx,yy,z+(j%3-1)*.8*s,2.5*s,.83*s,1.8*s)}}
+// Separate botanical silhouettes: branching pine crowns versus jointed bamboo culms.
+const pineBark=surface('pineBark','#655d50','soil',2),bambooStem=mat('bambooStem','#5d7051'),bambooNode=mat('bambooNode','#93a17b');
+let vegetationSeed=731;const vr=()=>{vegetationSeed=(1664525*vegetationSeed+1013904223)>>>0;return vegetationSeed/4294967296};const vv=(a,b)=>a+(b-a)*vr();
+function foliageMaterial(name,pine){const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d');
+ for(let k=0;k<(pine?23:13);k++){const start=[256,490],tip=[vv(35,477),vv(28,275)],dx=tip[0]-start[0],dy=tip[1]-start[1];g.strokeStyle=pine?'#635e3b':'#718251';g.lineWidth=pine?2.5:1.7;g.beginPath();g.moveTo(...start);g.lineTo(...tip);g.stroke();
+  for(let j=0;j<(pine?44:15);j++){const t=.16+j/(pine?52:19),x=start[0]+dx*t,y=start[1]+dy*t;for(const side of [-1,1]){const ang=Math.atan2(dy,dx)+side*vv(.48,1.15),len=vv(pine?14:24,pine?29:44),tx=x+Math.cos(ang)*len,ty=y+Math.sin(ang)*len;g.strokeStyle=['#254730','#3c5d36','#526a40','#66814a'][Math.floor(vr()*4)];g.fillStyle=g.strokeStyle;g.lineWidth=pine?1.45:1;if(pine){g.beginPath();g.moveTo(x,y);g.lineTo(tx,ty);g.stroke()}else{const nx=-Math.sin(ang)*4,ny=Math.cos(ang)*4;g.beginPath();g.moveTo(x,y);g.quadraticCurveTo((x+tx)/2+nx,(y+ty)/2+ny,tx,ty);g.quadraticCurveTo((x+tx)/2-nx,(y+ty)/2-ny,x,y);g.fill()}}}
+ }
+ const tex=new pc.Texture(device,{width:512,height:512,format:pc.PIXELFORMAT_RGBA8,mipmaps:true,flipY:false}),raw=g.getImageData(0,0,512,512).data,out=tex.lock();for(let y=0;y<512;y++)out.set(raw.subarray((511-y)*2048,(512-y)*2048),y*2048);tex.unlock();const m=mat(name,'#ffffff');m.diffuseMap=tex;m.opacityMap=tex;m.opacityMapChannel='a';m.alphaTest=.27;m.cull=pc.CULLFACE_NONE;m.twoSidedLighting=true;m.update();return m;
+}
+const pineNeedles=foliageMaterial('pineNeedles',true),bambooLeaves=foliageMaterial('bambooLeaves',false);
+function foliageCard(f,m,x,y,z,w,h,az,pitch){const a=az*Math.PI/180,b=pitch*Math.PI/180,r=[Math.cos(a),0,Math.sin(a)],u=[-Math.sin(a)*Math.sin(b),Math.cos(b),Math.cos(a)*Math.sin(b)],points=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([i,j])=>f.point(x+r[0]*i*w/2+u[0]*j*h/2,y+u[1]*j*h/2,z+r[2]*i*w/2+u[2]*j*h/2)),ab=points[1].map((q,i)=>q-points[0][i]),ac=points[2].map((q,i)=>q-points[0][i]),n=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]],l=Math.hypot(...n);geom(now,m,points.flat(),Array(4).fill(n.map(v=>v/l)).flat(),[0,0,1,0,1,1,0,1],[0,1,2,0,2,3])}
+function photoPine(x,z,s=1){const bend=vv(-.7,.9),turn=vv(-.5,.5),levels=[[x,.3,z],[x+bend,4.8*s,z+.25],[x+bend*.4,8.7*s,z+turn],[x+.45,11.8*s,z-.2]];for(let i=1;i<levels.length;i++)tube(school,pineBark,levels[i-1],levels[i],(.38-i*.075)*s,9);
+ for(let j=0;j<9;j++){const a=j*2.4+vv(-.3,.3),yy=(7.5+j*.53)*s,rad=vv(1.8,3.3)*s,cx=x+Math.cos(a)*rad,cz=z+Math.sin(a)*rad,mid=[x+Math.cos(a)*rad*.56,yy-.18, z+Math.sin(a)*rad*.56];tube(school,pineBark,[x+bend*.4,yy-.75,z],mid,.115*s,7);tube(school,pineBark,mid,[cx,yy+.6*s,cz],.065*s,6);
+  for(let k=0;k<5;k++){const ang=a+k*1.5,px=cx+Math.cos(ang)*vv(.25,1.1)*s,pz=cz+Math.sin(ang)*vv(.25,1.1)*s,py=yy+vv(.2,1.2)*s;tube(school,pineBark,[cx,yy+.6*s,cz],[px,py,pz],.025*s,5);for(let q=0;q<3;q++)foliageCard(school,pineNeedles,px,py,pz,vv(1.8,2.5)*s,vv(1.3,1.9)*s,a*57.3+q*60,vv(15,75))}
+ }
+ for(let k=0;k<10;k++){const a=k*2.4;foliageCard(school,pineNeedles,x+.45+Math.cos(a)*.75*s,(11.8+Math.sin(k)*.35)*s,z-.2+Math.sin(a)*.75*s,2.5*s,1.9*s,k*41,35+k%4*12)}
+}
+function bambooPlant(f,x,z,h,lean=0){const base=f.point(x,0,z);if(pathDistance(base[0],base[2],bambooRouteWorld)<6.4)return;const bendZ=vv(-.35,.35);for(let j=0;j<4;j++){let t=j/4,u=(j+1)/4;tube(f,bambooStem,[x+lean*t*t,.3+h*t,z+bendZ*t*t],[x+lean*u*u,.3+h*u,z+bendZ*u*u],.065*(1-t*.35),6)}for(let y=.9;y<h;y+=.72){const t=y/h;tube(f,bambooNode,[x+lean*t*t,y,z+bendZ*t*t],[x+lean*t*t,y+.035,z+bendZ*t*t],.075*(1-t*.35),6)}
+ for(let k=0;k<7;k++){const y=h*(.53+k*.064),t=y/h,a=k*2.399+vv(0,.3),r=vv(.65,1.45),bx=x+lean*t*t,bz=z+bendZ*t*t,ex=bx+Math.cos(a)*r,ez=bz+Math.sin(a)*r;tube(f,bambooStem,[bx,y,bz],[ex,y+.28,ez],.018,5);for(let q=0;q<2;q++)foliageCard(f,bambooLeaves,ex,y+.55,ez,vv(1.55,2.15),vv(1.35,1.85),a*57.3+q*85,vv(-30,30))}
+}
+
+// Lawn edge: mature pines in the red rectangle. The grove behind them is bamboo.
 for(let z=17;z<=62;z+=7.3)photoPine(42,z,.95+(z%3)*.045);
 for(let z=17;z<64;z+=1.55)school.sphere(leaf,42,.9,z,1.5,.65,1.08);
-const bambooStem=mat('bambooStem','#768c55');for(let i=0;i<90;i++){let x=55.5+(i%5)*1.65,z=9+Math.floor(i/5)*3.1,hh=7+(i%7)*.35;tube(school,bambooStem,[x,.35,z],[x-.5,hh,z+.3],.05);if(i%2===0)school.sphere(leaf2,x,hh-1,z,1.1,2,1.1)}
+for(let i=0;i<156;i++){const x=55.2+(i%6)*1.23,z=8+Math.floor(i/6)*2.2;bambooPlant(school,x,z,10.4+(i%7)*.48,(i%3-1)*.5)}
 function shelter(x,z){for(let q of [-1,1])for(let r of [-1,1])school.box(wood,x+q*1.55,1.7,z+r*1.1,.12,2.8,.12);for(let row=0;row<12;row++){school.box(wood,x, .65+row*.18,z-1.1,3.2,.115,.1);for(let q of [-1,1])school.box(wood,x+q*1.55,.65+row*.18,z,.1,.115,2.2)}school.box(wood,x,.62,z,3.1,.14,2.2);for(let q of [-1,1])for(let k=0;k<12;k++){let xx=q*(k+.5)*1.8/12,yy=3.6-Math.abs(xx)*.5;school.box(roofDark,x+xx,yy,z,.18,.12,2.7)}}
 for(let z of [20,30.5,41,51.5]){shelter(-40.5,z);const p=school.point(-43.2,0,z-2);tree(now,p[0],p[2],.72)}
 // White low fence and hedges separate grass from the sand play space.
@@ -187,15 +210,15 @@ for(let x of [32.5,34]){tube(school,metal,[x,.45,72],[x,1.8,72],.06);tube(school
 // Two seesaws occupy the left/front sand area.
 for(let z of [78.5,81.5]){school.box(dark,-23,.65,z,.55,.55,.75);tube(school,metal,[-27,.72,z],[-19,1.05,z],.09);for(let x of [-26.4,-24.8,-21.2,-19.6]){school.box(x<-23?red:orangePanel,x,.89+(x+23)*.04,z,.75,.16,.7);tube(school,metal,[x,1,z],[x,1.4,z],.035)}}
 // Wide steps beside the mural lead up to the covered upper terrace.
-for(let k=0;k<11;k++)school.box(stone,7,.4+k*.14,87.8+k*.57,41,.2+k*.28,.62);
-for(let x of [-12,1,15,27]){tube(school,metal,[x,.55,87],[x,1.5,87],.035);tube(school,metal,[x,1.5,87],[x,3.1,94.4],.035);tube(school,metal,[x,3.1,94.4],[x,2.2,94.4],.035)}
-for(let x of [-9,3,16]){tube(school,metal,[x,2,98],[x,4.2,98],.045);const cm=x<0?red:x<10?bluePanel:orangePanel;for(let i=0;i<8;i++){let a=i*6.283/8,b=(i+1)*6.283/8;const pts=[[x,4.5,98],[x+Math.cos(b)*3.2,3.65,98+Math.sin(b)*3.2],[x+Math.cos(a)*3.2,3.65,98+Math.sin(a)*3.2]].map(p=>school.point(...p));geom(now,cm,pts.flat(),[0,1,0,0,1,0,0,1,0],[.5,.5,0,0,1,0],[0,1,2])}}
+for(let k=0;k<11;k++)school.box(stone,1.4,.4+k*.14,87.8+k*.57,29.8,.2+k*.28,.62);
+for(let x of [-12,1,15]){tube(school,metal,[x,.55,87],[x,1.5,87],.035);tube(school,metal,[x,1.5,87],[x,3.1,94.4],.035);tube(school,metal,[x,3.1,94.4],[x,2.2,94.4],.035)}
+school.box(stone,1.4,1.65,99,29.8,3.3,10);
 const lawnPos=school.point(0,0,38.5),sandPos=school.point(-2,0,74.7);worldLabel('잔디운동장',lawnPos[0],lawnPos[2],'now',2);worldLabel('모래운동장',sandPos[0],sandPos[2],'now',2);
 
 function canopy(f,x,z,len){for(let k=-len/2;k<=len/2;k+=4)f.box(wood,x+k,1.6,z+1.7,.12,3.2,.12);for(let k=0;k<8;k++){let zz=-1.9+k*.55,yy=3.1+Math.sqrt(Math.max(0,4-zz*zz))*.27;f.box(roof,x,yy,z+zz,len,.07,.58)}for(let k=-len/2;k<=len/2;k+=2)f.box(metal,x+k,3.55,z,.055,.055,4.1)}
 // Continuous L-shaped school canopy emitted below.
 // Gaenari: white three-storey block and the actual whale mural mapped to the end wall.
-const gp=school.point(37,0,86),gaenari=frame(gp[0],gp[2],schoolAngle+90);
+const gp=school.point(23,0,114),gaenari=frame(gp[0],gp[2],schoolAngle+90);
 gaenari.box(white,0,7.2,0,39,14.4,13);gaenari.box(roof,0,14.55,0,40,.3,14);
 for(let floor=0;floor<3;floor++)for(let x=-16;x<=16;x+=5){let y=2.4+floor*4.5;gaenari.box(stone,x,y,6.6,3.3,2.55,.18);gaenari.box(glass,x,y,6.72,2.9,2.2,.08);gaenari.box(white,x,y,6.81,.07,2.3,.08);gaenari.box(white,x,y-.45,6.82,3,.07,.08)}
 const muralEnd=frame(gp[0],gp[2],schoolAngle+180);
@@ -209,9 +232,28 @@ for(let x=-18;x<=18;x+=3.7){for(let y of [2.35,6.8]){parang.box(stone,x,y,6.5,2.
 canopy(parang,0,9,46);sign(parang,'파랑새관',-3,17.2,6.75,10,1.25);
 // Songjuk hall: eastern/right block of the south-eastern school precinct.
 const sp=school.point(66,0,97),songjuk=frame(sp[0],sp[2],schoolAngle-90);
-songjuk.box(white,0,6.4,0,46,12.8,13);songjuk.box(roof,0,12.97,0,47,.34,14);
-for(let floor=0;floor<3;floor++)for(let x=-20;x<=20;x+=4.4){let y=2.3+floor*4.1;songjuk.box(stone,x,y,6.65,3.35,2.55,.16);songjuk.box(glass,x,y,6.79,3.05,2.24,.09);songjuk.box(white,x,y,6.86,.09,2.3,.1);songjuk.box(white,x,y-.4,6.86,3.12,.09,.1)}
-for(let y of [4.2,8.3,12.7])songjuk.box(stone,0,y,6.7,46,.33,.28);songjuk.box(greenPanel,0,2,6.8,4.5,4,.25);canopy(songjuk,0,9,46);sign(songjuk,'송죽관',0,14,6.9,12,1.4);
+const songBlue=mat('songjukBlue','#0865a5',35),songSeam=mat('songjukSeam','#194b76'),songGray=mat('songjukGray','#929fa6'),songYellow=mat('songjukYellow','#d5ce43'),songRed=mat('songjukRed','#ab4d3b');
+songjuk.box(white,0,6.4,0,46,12.8,13);
+songjuk.box(songGray,0,2.05,6.57,46,4.1,.18);
+songjuk.box(white,0,6.15,6.58,46,4.1,.2);
+songjuk.box(songBlue,0,10.7,6.73,47,5,.42);
+songjuk.box(songBlue,0,13.18,0,47,.3,13.8);
+// The blue cladding wraps the end wall. Fine seams follow the vertical metal panels.
+for(const side of [-1,1]){songjuk.box(songBlue,side*23.2,10.7,0,.4,5,13.4);for(let z=-6.3;z<6.5;z+=1.15)songjuk.box(songSeam,side*23.43,10.7,z,.025,4.9,.045)}
+for(let x=-23;x<23.1;x+=1.15)songjuk.box(songSeam,x,10.7,6.954,.045,4.95,.022);
+// Orange frames, yellow panels between floors and green panels at the base.
+for(const [cx,top]of [[-13,8.25],[4.4,11.6]]){for(const dx of [-2.8,2.8])songjuk.box(orangePanel,cx+dx,top/2,7.02,.7,top,.18);songjuk.box(orangePanel,cx,top-.42,7.02,6.3,.85,.18);songjuk.box(songYellow,cx,4.22,6.85,4.9,1.65,.16);songjuk.box(greenPanel,cx,.93,6.86,4.9,1.65,.18)}
+for(let z=-6;z<6;z+=1.5){songjuk.box(songRed,-23.18,4.1,z,.18,8.2,1.45);songjuk.box(songYellow,-23.3,4.2,z,.1,1.65,1.45);if(z>-2)songjuk.box(greenPanel,-23.31,1.25,z,.12,2.4,1.45)}
+function songWindow(x,y,z=7.12){songjuk.box(stone,x,y,z,3.65,2.7,.18);songjuk.box(glass,x,y,z+.12,3.4,2.46,.1);for(const dx of [-1.12,0,1.12])songjuk.box(white,x+dx,y,z+.22,.065,2.55,.07);songjuk.box(white,x,y+.15,z+.23,3.5,.065,.07);songjuk.box(white,x,y-1.36,z+.25,3.8,.12,.3);for(const yy of [-.72,-.4,-.08])songjuk.box(metal,x,y+yy,z+.4,3.65,.04,.04)}
+for(let x=-18;x<=21.1;x+=4.9)for(const y of [2.03,6.08,10.1])songWindow(x,y);
+// Entrance is at the right end, with a short curved rain cover, not a full-width verandah.
+songjuk.box(dark,21,1.65,7.05,3.2,3.3,.18);songjuk.box(glass,21,1.65,7.18,2.9,3.05,.08);songjuk.box(metal,21,1.65,7.27,.08,3.12,.08);canopy(songjuk,21,8.7,5.2);
+songjuk.box(roof,0,13.36,0,45,.09,11.8);
+wallText(songjuk,'35 송죽관',-18.8,12.23,7.02,6,.65,'#ffffff');
+// Small planted forecourt shown in the photograph.
+songjuk.box(pavers,0,.24,12.2,47,.16,8.5);
+for(const x of [-15,-5,7]){songjuk.sphere(grass,x,.34,13,2.8,.15,2);songjuk.sphere(leaf,x,.75,13,1.15,.55,.85)}
+
 // The hall is along the rear of the main block; its front faces the end access road.
 const kp=mapPoint(...mapAnchors.hall),kkachi=frame(kp[0],kp[2],schoolAngle+90);
 kkachi.box(stone,0,4.45,0,25,8.9,40);kkachi.box(stone,0,8.95,20.1,25.5,.7,.36);
@@ -235,6 +277,14 @@ sign(kkachi,'까치관',1,9.8,20.5,10,1);
 
 // University roof topology: transverse wings, connecting corridors, courts and formal landscaping.
 // Transverse university wings are authored below.
+
+// Crest sampled from the supplied close-up photograph, with its original green and gold detail.
+const crestImage=new Image();crestImage.src=window.schoolBadgeReference;await crestImage.decode();
+const crestCanvas=document.createElement('canvas');crestCanvas.width=crestCanvas.height=256;const cg=crestCanvas.getContext('2d');cg.scale(256/58,256/58);cg.translate(-269,-89);cg.beginPath();
+for(const [i,p]of [[297,92],[303,97],[307,104],[307,111],[316,122],[322,130],[322,136],[317,139],[306,140],[302,145],[294,145],[289,141],[278,141],[271,137],[273,130],[281,116],[284,112],[286,103],[291,97]].entries())i?cg.lineTo(...p):cg.moveTo(...p);cg.closePath();cg.clip();cg.drawImage(crestImage,0,0);
+const crestTexture=new pc.Texture(device,{width:256,height:256,format:pc.PIXELFORMAT_RGBA8,mipmaps:true,flipY:false}),crestPixels=cg.getImageData(0,0,256,256).data,crestDest=crestTexture.lock();for(let row=0;row<256;row++)crestDest.set(crestPixels.subarray((255-row)*1024,(256-row)*1024),row*1024);crestTexture.unlock();
+const crestMat=mat('schoolCrest','#ffffff',12);crestMat.diffuseMap=crestTexture;crestMat.opacityMap=crestTexture;crestMat.opacityMapChannel='a';crestMat.alphaTest=.15;crestMat.cull=pc.CULLFACE_BACK;crestMat.update();
+school.quad(crestMat,[[13.13,19.05,6.75],[14.87,19.05,6.75],[14.87,20.79,6.75],[13.13,20.79,6.75]],[0,0,1,0,1,1,0,1]);
 
 // Main field boundary and small parking rows, emitted on modern ground only.
 
@@ -312,7 +362,7 @@ function animateWell(t){if(era!=='old')return;const lift=(Math.sin(t*.85)+1)*.6;
 
 // Photograph-guided additions to the existing school volumes.
 function wallText(f,text,x,y,z,w,h,color='#214c76',bg=null){
- if(!/^(어린이|보호구역|20|30|카페|문구)$/.test(text))return;
+ if(!/^(어린이|보호구역|20|30|카페|문구|GS25|STARBUCKS|COFFEE|안내|35 송죽관)$/.test(text))return;
  const c=document.createElement('canvas');c.width=1024;c.height=128;const g=c.getContext('2d');if(bg){g.fillStyle=bg;g.fillRect(0,0,c.width,c.height)}g.fillStyle=color;g.font='bold 70px "Malgun Gothic", "Noto Sans CJK KR", sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(text,512,64,980);
  const rgba=g.getImageData(0,0,c.width,c.height).data,t=new pc.Texture(device,{width:c.width,height:c.height,format:pc.PIXELFORMAT_RGBA8,mipmaps:true,flipY:false});const dest=t.lock(),stride=c.width*4;for(let row=0;row<c.height;row++)dest.set(rgba.subarray((c.height-1-row)*stride,(c.height-row)*stride),row*stride);t.unlock();
  const m=mat('lettering'+Object.keys(mats).length,'#ffffff',8);m.diffuseMap=t;m.opacityMap=t;m.opacityMapChannel='a';m.alphaTest=.2;m.cull=pc.CULLFACE_BACK;m.update();f.quad(m,[[x-w/2,y-h/2,z],[x+w/2,y-h/2,z],[x+w/2,y+h/2,z],[x-w/2,y+h/2,z]],[0,0,1,0,1,1,0,1]);
@@ -325,7 +375,7 @@ function roofDetail(f,w,d,h){
  f.box(stone,w*.35,h+1.65,0,4.4,3.1,3.8);f.box(roofDark,w*.35,h+3.24,0,4.7,.2,4.1);
  for(let x=-w/2+1;x<w/2;x+=12)for(let s of [-1,1]){f.box(metal,x,h*.5,s*(d/2+.3),.12,h,.12)}
 }
-roofDetail(school,87,12,18.8);roofDetail(gaenari,39,13,14.6);roofDetail(songjuk,46,13,13);roofDetail(parang,44,12,10.35);
+roofDetail(school,87,12,18.8);roofDetail(gaenari,39,13,14.6);roofDetail(parang,44,12,10.35);
 // Parangsae's central tower remains above its surrounding lower roof.
 parang.box(roofMembrane,-3,18.85,0,12.5,.16,10.6);for(let x of [-9.5,3.5])parang.box(white,x,19.1,0,.25,.55,11);
 for(let i=0;i<30;i++)parang.box(roofDark,-21.5+i*1.45,8.3,6.32,.045,4.1,.04);
@@ -392,8 +442,8 @@ function flatQuad(f,m,ps,y){const p=ps.map(([x,z])=>f.point(x,y,z));geom(now,m,p
 function flatRing(f,m,x,z,rx,rz,width,y,steps=96){for(let k=0;k<steps;k++){const a=k*Math.PI*2/steps,b=(k+1)*Math.PI*2/steps;flatQuad(f,m,[[x+Math.cos(a)*rx,z+Math.sin(a)*rz],[x+Math.cos(b)*rx,z+Math.sin(b)*rz],[x+Math.cos(b)*(rx-width),z+Math.sin(b)*(rz-width)],[x+Math.cos(a)*(rx-width),z+Math.sin(a)*(rz-width)]],y)}}
 function disk(f,m,x,z,rx,rz,y,steps=64){const pts=[];for(let k=0;k<steps;k++){const a=k*2*Math.PI/steps,p=f.point(x+Math.cos(a)*rx,y,z+Math.sin(a)*rz);pts.push([p[0],p[2]])}poly(now,m,pts,y)}
 function railing(f,x1,z1,x2,z2,y=1.3){const len=Math.hypot(x2-x1,z2-z1);for(let k=0;k<=Math.ceil(len/2.4);k++){let t=k/Math.ceil(len/2.4);tube(f,metal,[x1+(x2-x1)*t,.45,z1+(z2-z1)*t],[x1+(x2-x1)*t,y,z1+(z2-z1)*t],.045)}for(let h of [y-.5,y-.25,y])tube(f,metal,[x1,h,z1],[x2,h,z2],.035)}
-function bareTree(f,x,z,s=1){tube(f,wood,[x,.35,z],[x+.15*s,6.9*s,z],.17*s,8);for(let j=0;j<7;j++){const a=j*2.399,yy=(3.4+j*.35)*s,xx=x+Math.cos(a)*2.8*s,zz=z+Math.sin(a)*2.8*s;tube(f,wood,[x,yy,z],[xx,yy+2.6*s,zz],.07*s);for(let q of [-1,1])tube(f,wood,[xx,yy+2*s,zz],[xx+q*.9*s,yy+3.2*s,zz+q*.8*s],.023*s)}for(let q of [-1,1])tube(f,wood,[x+q*1.05,.3,z+.4],[x,2.4*s,z],.045)}
-function campusLamp(f,x,z){tube(f,metal,[x,.3,z],[x,5.1,z],.085);tube(f,metal,[x,5.1,z],[x+.7,5.85,z],.08);f.box(dark,x+.3,5.9,z,.85,.12,.35);f.box(white,x+.3,5.81,z,.7,.025,.23)}
+function bareTree(f,x,z,s=1){const wp=f.point(x,0,z);if(pathDistance(wp[0],wp[2],bambooRouteWorld)<6.5)return;tube(f,wood,[x,.35,z],[x+.15*s,6.9*s,z],.17*s,8);for(let j=0;j<7;j++){const a=j*2.399,yy=(3.4+j*.35)*s,xx=x+Math.cos(a)*2.8*s,zz=z+Math.sin(a)*2.8*s;tube(f,wood,[x,yy,z],[xx,yy+2.6*s,zz],.07*s);for(let q of [-1,1])tube(f,wood,[xx,yy+2*s,zz],[xx+q*.9*s,yy+3.2*s,zz+q*.8*s],.023*s)}for(let q of [-1,1])tube(f,wood,[x+q*1.05,.3,z+.4],[x,2.4*s,z],.045)}
+function campusLamp(f,x,z){const lp=f.point(x+.3,5.65,z);lampPositions.push({x:lp[0],y:lp[1],z:lp[2]});tube(f,metal,[x,.3,z],[x,5.1,z],.085);tube(f,metal,[x,5.1,z],[x+.7,5.85,z],.08);f.box(dark,x+.3,5.9,z,.85,.12,.35);f.box(white,x+.3,5.81,z,.7,.025,.23)}
 function bench(f,x,z){for(let q of [-1,1]){f.box(dark,x+q*.9,.55,z,.09,.8,.65);f.box(dark,x+q*.9,.98,z-.32,.08,1.1,.08)}for(let k=0;k<4;k++)f.box(wood,x,.93,z-.3+k*.18,2.4,.09,.14);for(let k=0;k<3;k++)f.box(wood,x,1.16+k*.18,z-.34,2.4,.13,.09)}
 // One coordinate transform is shared by every traced campus feature.
 const fieldTrace=[[389,257],[463,260],[508,284],[725,503],[780,563],[801,607],[789,660],[754,701],[708,726],[669,730],[624,713],[566,675],[425,517],[349,431],[331,372],[341,318]];
@@ -548,18 +598,18 @@ const aroundSchool=[[-60,139],[90,139],[90,-50]].map(([x,z])=>{const p=school.po
 const crossingPos=mapPoint(474,715),crossing=frame(crossingPos[0],crossingPos[2],-45);
 crossing.box(red,0,.34,0,13,.06,5.5);for(let x=-5.6;x<6;x+=1.3)crossing.box(roadYellow,x,.383,0,.75,.02,4.7);
 const bendPos=mapPoint(620,772),bend=frame(bendPos[0],bendPos[2],79);roadText(bend,'20',0,0,3,3.5);roadText(bend,'어린이',0,6,4,3);roadText(bend,'보호구역',0,10,4,3);
-for(let i=0;i<70;i++){const t=i/69,p=mapPoint(549+t*168,814+Math.sin(t*2.5)*16),h=6+(i%7)*.45;tube(frame(0,0,0),bambooStem,[p[0],.3,p[2]],[p[0]-.3,h,p[2]+.2],.045);if(i%3===0)ellipsoid(now,leaf,p[0],h-.5,p[2],1.3,2,1.1,8,5)}
+for(let i=0;i<95;i++){const t=i/94,p=mapPoint(549+t*168,814+Math.sin(t*2.5)*16);bambooPlant(frame(0,0,0),p[0],p[2],10.2+(i%7)*.42,(i%3-1)*.5)}
 // Connected covered walkways follow the main front and turn along the lawn's western edge.
 const awningRed=mat('awningRed','#de795f'),awningWhite=mat('awningWhite','#e6e8df');
 const canopyPaths=[[[-43,9],[42,9],true,0,0],[[-43,9],[-48,17],false,0,1.8],[[-48,17],[-48,66],false,1.8,1.8]];
 function coveredWalk(a,b,coloured,y0=0,y1=0){const aa=school.point(a[0],0,a[1]),bb=school.point(b[0],0,b[1]),len=Math.hypot(bb[0]-aa[0],bb[2]-aa[2]),angle=Math.atan2(-(bb[2]-aa[2]),bb[0]-aa[0])*180/Math.PI,f=frame((aa[0]+bb[0])/2,(aa[2]+bb[2])/2,angle);const level=x=>y0+(x+len/2)/len*(y1-y0);for(let x=-len/2;x<len/2;x+=1)f.box(pavers,x+.5,.32+level(x+.5),0,1.04,.2,3);for(let x=-len/2;x<len/2+.1;x+=3)for(let q of [-1,1]){f.box(wood,x,1.65+level(x),q*1.35,.12,2.7,.12);f.box(metal,x,3+level(x),q*1.35,.1,.3,.1)}for(let x=-len/2;x<len/2;x+=1.5){for(let k=0;k<12;k++){let z=-1.7+(k+.5)*3.4/12,y=3.05+level(x+.75)+.62*Math.sqrt(Math.max(0,1-(z/1.7)**2));f.box(coloured?(Math.floor((x+len/2)/3)%2?awningRed:awningWhite):roofDark,x+.75,y,z,1.53,.065,.3)}for(let k=0;k<12;k++){let z=-1.7+(k+.5)*3.4/12,y=3.1+level(x)+.62*Math.sqrt(Math.max(0,1-(z/1.7)**2));f.box(metal,x,y,z,.04,.05,.3)}}for(let q of [-1,1])tube(f,metal,[-len/2,3.05+y0,q*1.7],[len/2,3.05+y1,q*1.7],.07)}
-canopyPaths.forEach(p=>coveredWalk(...p));
+canopyPaths.forEach(p=>coveredWalk(...p));coveredWalk([-13,98],[16,98],false,3.3,3.3);
 
 worldLabel('대학교 운동장',32,130,'now',2);
 const detailStops={field:{name:'넓은 운동장',x:fieldCentre[0],z:fieldCentre[2],distance:440,pitch:55,yaw:43},sculpture:{name:'조형물 가까이',x:statuePos[0],z:statuePos[2],distance:23,pitch:22,yaw:43},entrance:{name:'입구 쪽',x:gatePoint[0],z:gatePoint[2],distance:95,pitch:35,yaw:82},street:{name:'큰길 쪽',x:500,z:216,distance:280,pitch:48,yaw:0},island:{name:'교내 길',x:roundPos[0],z:roundPos[2],distance:105,pitch:40,yaw:55},museum:{name:'주차장 쪽',x:museumPos[0]-12,z:museumPos[2]+12,distance:125,pitch:28,yaw:-47}};
 
 // Eastern skyline landmark, west of the station and river. No lettering or logos.
-const skylineTower=frame(585,190,-8);
+const skylineTower=frame(405,156,82);
 skylineTower.box(pavers,0,.2,0,66,.4,58);skylineTower.box(urbanPlaster,0,42,0,33,84,26);skylineTower.box(urbanPlaster,4,43,0,16,86,30);
 for(let q of [-1,1])for(let x=-14;x<=14;x+=3.5){skylineTower.box(windowReflect,x,43,q*13.2,2.5,78,.2);skylineTower.box(white,x-1.35,43,q*13.4,.33,81,.4)}
 for(let q of [-1,1])for(let z=-10;z<=10;z+=3.5){skylineTower.box(windowReflect,q*16.6,43,z,.2,78,2.5);skylineTower.box(white,q*16.8,43,z-1.4,.4,81,.33)}
@@ -576,15 +626,84 @@ for(let z of [-6,7])for(let x=-11;x<12;x+=1.7)metro.box(white,x,.285,z,.9,.025,4
 function districtBlock(x,z,w,d,h,a){const f=frame(x,z,a);f.box(urbanWalls[Math.floor(rnd()*4)],0,h/2,0,w,h,d);f.box(roofMembrane,0,h+.16,0,w,.25,d);for(let q of [-1,1]){f.box(stone,0,h+.35,q*d/2,w,.4,.2);f.box(stone,q*w/2,h+.35,0,.2,.4,d);for(let y=2;y<h;y+=3.4){for(let xx=-w/2+2;xx<w/2-1;xx+=3.7)f.box(windowReflect,xx,y,q*(d/2+.07),2,1.6,.1);for(let zz=-d/2+2;zz<d/2-1;zz+=3.7)f.box(windowReflect,q*(w/2+.07),y,zz,.1,1.6,1.8)}}f.box(rooftopMetal,w*.2,h+.8,-d*.2,2,1.2,1.8);f.box(dark,0,1.2,d/2+.1,1.5,2.4,.12)}
 for(let row=0;row<30;row++)for(let coln=0;coln<35;coln++){const x=-470+coln*34+(row%2)*7,z=-280+row*36;if(reservedContext(x,z)||inSchoolArea(x,z)||nearRoad(619+x/.85,460+z/.85,13)||Math.hypot(x-585,z-210)<58||x>645&&z>50)continue;const angle=(row%3===0?-8:43),w=12+(coln%4)*2.2,d=12+(row%3)*2,h=5+((row+coln)%5)*2.1;if(Math.hypot(x-32,z-130)<310)building(619+x/.85,460+z/.85,w,d,h,angle,false);else districtBlock(x,z,w,d,h,angle)}
 
+// The mural end is a continuous wall. The terrace stairs are only to its right.
+// A smooth, two-way lane through the bamboo belt links the side gate and island.
+const pathStart=school.point(50,0,66),pathMid=school.point(61,0,54);
+const schoolPath=bambooRouteWorld;
+function pathDistance(x,z,pts){let best=Infinity;for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));best=Math.min(best,Math.hypot(x-a[0]-t*dx,z-a[1]-t*dz))}return best}
+function bench(f,x,z){for(const xx of [-.85,.85]){f.box(dark,x+xx,.42,z,.1,.8,.6);f.box(dark,x+xx,.86,z+.29,.08,1.05,.08)}for(let k=0;k<4;k++){f.box(wood,x,.83,z-.3+k*.18,2.2,.075,.13);f.box(wood,x,1.02+k*.12,z+.33,2.2,.075,.08)}}
+for(let i=1;i<schoolPath.length;i++){
+ const a=schoolPath[i-1],b=schoolPath[i],len=Math.hypot(b[0]-a[0],b[1]-a[1]),ang=Math.atan2(b[0]-a[0],b[1]-a[1])*180/Math.PI,f=frame((a[0]+b[0])/2,(a[1]+b[1])/2,ang);
+ f.box(asphalt,0,.39,0,7.2,.18,len+.7);
+ for(const q of [-1,1]){f.box(curb,q*3.7,.48,0,.24,.3,len+.5);f.box(pavers,q*4.9,.45,0,2.2,.24,len+.5);f.box(white,q*3.25,.495,0,.1,.025,len+2)}
+ for(let z=-len/2;z<len/2;z+=1.8)for(const q of [-1,1])for(let r=0;r<3;r++){
+  const x=q*(7+r*.65+rand(-.35,.35)),zz=z+rand(-.35,.35),h=rand(5.8,9);
+  bambooPlant(f,x,zz,10.5+(h-5.8)*1.05,-q*.75);
+ }
+ for(let z=-len/2+8;z<len/2-4;z+=20){bench(f,-5,z);campusLamp(f,5.7,z+2)}
+}
+for(const i of [3,11,19]){const p=schoolPath[i],q=schoolPath[i+1],f=frame(p[0],p[1],Math.atan2(q[0]-p[0],q[1]-p[1])*180/Math.PI);bench(f,-5,0);campusLamp(f,5.7,0)}
+const booth=frame(pathStart[0],pathStart[2],schoolAngle);booth.box(stone,-6,1.6,-3,2.8,3,3.2);booth.box(roof,-6,3.18,-3,3.3,.2,3.7);for(let x=-6.9;x<-4.9;x+=.65)booth.box(windowReflect,x,2.05,-1.35,.58,1.1,.08);wallText(booth,'안내',-6,2.9,-1.28,1.1,.32);
+// Entrance scene: close junction, shopfronts to the left and wooded boundary to the right.
+const gateStreet=frame(gatePoint[0],gatePoint[2],82);
+gateStreet.box(asphalt,0,.38,28,76,.2,12);
+for(const z of [20.8,35.2])gateStreet.box(pavers,0,.4,z,76,.3,2.4);
+for(let x=-4.5;x<5;x+=1.3)gateStreet.box(roadYellow,x,.495,19,.7,.02,4.5);
+for(let z=24;z<32;z+=1.3)gateStreet.box(roadYellow,-13,.495,z,4,.02,.75);
+for(const x of [-9,9])signal(gateStreet,x,19.5);
+for(let x=-34;x<35;x+=3)gateStreet.box(roadYellow,x,.5,28,1.8,.02,.1);
+const shopSpecs=[[19,40,14,8,7.7,'GS25',bluePanel],[34,40,14,8,11.5,'STARBUCKS',greenPanel],[48,41,12,9,10,'COFFEE',urbanBrick]];
+const shopGlow=mat('eveningShopGlass','#9eb5bd',65),lampGlow=mat('lampGlow','#e6ddbe');
+for(const [x,z,w,d,h,name,accent]of shopSpecs){const wp=gateStreet.point(x,0,z),store=frame(wp[0],wp[2],262);store.box(name==='COFFEE'?urbanBrick:urbanSand,0,h/2,0,w,h,d);roofDetail(store,w,d,h);store.box(shopGlow,0,1.8,d/2+.12,w-1.1,3.1,.12);for(let xx=-w/2+1;xx<w/2;xx+=2.5)store.box(metal,xx,1.8,d/2+.2,.09,3.2,.1);store.box(accent,0,3.8,d/2+.3,w,.9,.4);wallText(store,name,0,3.85,d/2+.53,w*.7,.57,'#fffdf4');for(let xx=-w/2+1.4;xx<w/2;xx+=3.4)for(let y=5.8;y<h-1;y+=3.2)store.box(windowReflect,xx,y,d/2+.08,2.4,1.9,.12);for(let xx=-w/2+.7;xx<w/2;xx+=2.1)store.box(stone,xx,.6,d/2+2,.14,1.2,.14);const light=store.point(0,3.1,d/2+2);lampPositions.push({x:light[0],y:light[1],z:light[2],shop:true})}
+for(let z=4;z<57;z+=3){gateStreet.box(urbanBrick,-13,1,z,.7,2,2.8);gateStreet.box(stone,-13,2.1,z,.86,.16,3);for(let r=0;r<3;r++){const p=gateStreet.point(-18-r*4,0,z);tree(now,p[0],p[2],1.05+r*.3)}}
+for(let k=0;k<16;k++){gateStreet.box(stone,-19-k*.5,.15+k*.14,10, .55,.3+k*.28,3);for(const q of [-1,1])tube(gateStreet,metal,[-19-k*.5,1.1+k*.28,10+q*1.6],[-19-(k+1)*.5,1.1+(k+1)*.28,10+q*1.6],.035)}
+for(const x of [-10,10])for(const z of [3,36,55])campusLamp(gateStreet,x,z);
+for(const x of [-39,39])for(const z of [12,58,88])campusLamp(school,x,z);
+// Old village: a communal rice field and three traditional children's games.
+const dureWorkers=[],playCentre={x:-257,z:302};
+box(old,soil,-335,.3,-76,39,.6,31);box(old,water,-335,.63,-76,37,.055,29);
+for(let x=-351;x<-317;x+=1.3)for(let z=-89;z<-61;z+=1.3){for(let k=-1;k<=1;k++)box(old,paddy,x+k*.09,.85,z,.045,.45+Math.abs(k)*.1,.06,k*13)}
+for(let row=0;row<2;row++)for(let j=0;j<5;j++){const p=makePerson('old',-347+j*5.1,-84+row*10,'함께 김매기하는 두레꾼 '+(row*5+j+1),['여기는 대조리입니다. 이웃들과 함께 논의 잡풀을 뽑고 있어요.','김매기는 벼 사이에 난 풀을 뽑는 일이에요. 벼가 잘 자라도록 돌보지요.','여럿이 힘을 모아 농사일을 하는 모임을 두레라고 해요.','함께 일하고 쉬는 시간에는 새참도 나누어 먹어요.'],'wader','weed',10+j*5);p.entity.setPosition(p.x,.67,p.z);dureWorkers.push(p)}
+const leader=makePerson('old',-315,-78,'두레의 일을 이끄는 사람',['우리 함께 힘을 모아 이 논부터 매 봅시다!','혼자 하기 힘든 농사일도 이웃들과 함께하면 해낼 수 있어요.','여러분은 친구와 힘을 모아 어떤 일을 해 보았나요?'],'farmer','wave',-60);
+const snack=makePerson('old',-315,-70,'새참을 가져온 사람',['일하느라 수고했어요. 잠시 쉬며 새참을 드세요.','이웃과 음식을 나누고 이야기를 나누어요.'],'water','wave',-70);
+box(old,wood,-315,.8,-68,2,.12,1.2);for(let j=0;j<4;j++)ellipsoid(old,white,-315.7+j*.46,.9,-68,.18,.08,.18);
+worldLabel('함께 김매기하는 두레',-335,-76,'old',4);
+// Swings are pivoted from a high wooden beam; the child stands on the board.
+const sx=playCentre.x,sz=playCentre.z;
+box(old,soil,sx,.16,sz+8,42,.3,39);tree(old,sx-10,sz-3,1.7);
+for(const x of [-2.2,2.2]){box(old,wood,sx+x,3.15,sz,.22,6.3,.25);box(old,wood,sx+x,1.7,sz+1,.18,3.4,.2)}box(old,wood,sx,6.25,sz,5.2,.22,.24);
+const swing=new pc.Entity('traditional-swing');old.addChild(swing);swing.setPosition(sx,6.1,sz);
+for(const x of [-.5,.5])primitive(swing,'cylinder',creamCloth,x,-2.5,0,.04,5,.04);
+primitive(swing,'box',wood,0,-5,0,1.3,.13,.65);
+const swingChild=makePerson('old',sx,sz,'그네 타는 아이',['줄을 꼭 잡고 그네를 타고 있어!','발을 구르면 높이 올라갔다가 다시 내려와.','친구야, 내가 내리면 네 차례야!'],'child','swing');swingChild.entity.reparent(swing);swingChild.entity.setLocalPosition(0,-4.9,0);swingChild.arms.forEach((a,i)=>a.setLocalEulerAngles(-130,0,i?15:-15));
+const boardRoot=new pc.Entity('neolttwigi');old.addChild(boardRoot);boardRoot.setPosition(sx+10,.7,sz+8);primitive(boardRoot,'box',wood,0,0,0,6.5,.16,.9);ellipsoid(old,thatch,sx+10,.37,sz+8,.6,.4,.7);
+const boardKids=[-1,1].map((q,i)=>makePerson('old',sx+10+q*2.8,sz+8,i?'널뛰기하는 동생':'널뛰기하는 언니',['널 양쪽 끝에 서서 번갈아 발을 굴러!','친구가 내려오면 내가 하늘로 뛰어올라. 이것이 널뛰기야.','서로 박자를 맞추는 게 중요해!'],'child','board',q*90));
+const kiteKids=[],kites=[];
+for(let i=0;i<2;i++){const x=sx-8+i*7,z=sz+17;const kid=makePerson('old',x,z,'연날리기하는 아이 '+(i+1),['바람을 타고 연이 높이 올라간다!','줄을 조금 풀었다 감았다 하며 연을 날려.','너희가 좋아하는 놀이는 무엇이니?'],'child','kite',10);primitive(kid.group,'box',wood,.3,1,-.3,.35,.12,.12);kiteKids.push(kid);const root=new pc.Entity('kite');old.addChild(root);const diamond=primitive(root,'box',i?red:bluePanel,0,0,0,2.1,2.1,.035);diamond.setLocalEulerAngles(0,0,45);primitive(root,'box',creamCloth,0,0,-.04,.07,2.9,.025);primitive(root,'box',creamCloth,0,0,-.04,2.9,.07,.025);for(let j=0;j<6;j++)primitive(root,'box',i?bluePanel:red,Math.sin(j)*.12,-1.7-j*.35,0,.12,.36,.04);const string=primitive(old,'cylinder',creamCloth,0,0,0,.013,1,.013);kites.push({root,string,x,z,i})}
+worldLabel('그네 · 널뛰기 · 연날리기',sx,sz+8,'old',5);
+function animateVillage(t){if(era!=='old')return;for(let p of dureWorkers){const v=t*1.8+p.phase;p.group.setLocalEulerAngles(47+Math.sin(v)*9,0,0);p.group.setLocalPosition(0,-.15,0);p.arms.forEach((a,i)=>a.setLocalEulerAngles(-25+Math.sin(v+i)*22,0,i?8:-8));p.legs.forEach((l,i)=>l.setLocalEulerAngles(-15,0,i?8:-8))}swing.setLocalEulerAngles(Math.sin(t*1.15)*29,0,0);swingChild.arms.forEach((a,i)=>a.setLocalEulerAngles(-130,0,i?15:-15));const angle=Math.sin(t*2.4)*14;boardRoot.setLocalEulerAngles(0,0,angle);boardKids.forEach((p,i)=>{const q=i?1:-1,y=.82+q*2.8*Math.sin(angle*Math.PI/180)+Math.max(0,Math.sin(t*2.4+q*Math.PI/2))*.55;p.entity.setPosition(sx+10+q*2.8,y,sz+8);p.arms.forEach((a,j)=>a.setLocalEulerAngles(0,0,(j?1:-1)*65))});for(const k of kites){const y=17+k.i*4+Math.sin(t*.8+k.i),x=k.x+5+Math.sin(t*.45+k.i)*2,z=k.z-13+Math.cos(t*.4)*1.5;k.root.setPosition(x,y,z);k.root.setEulerAngles(-12,Math.sin(t*.6)*15,Math.sin(t)*9);const a=new pc.Vec3(k.x+.3,1.1,k.z-.3),b=new pc.Vec3(x,y,z),delta=b.clone().sub(a);k.string.setPosition(a.clone().add(b).mulScalar(.5));k.string.setLocalScale(.013,delta.length(),.013);k.string.setRotation(new pc.Quat().setFromDirections(pc.Vec3.UP,delta.normalize()))}}
+// Point lights are pooled: only nearby lamps illuminate the night scene.
+const nightPool=[];for(let i=0;i<10;i++){const l=new pc.Entity('pooled-streetlight');l.addComponent('light',{type:'omni',color:new pc.Color(1,.78,.46),intensity:2.4,range:19,castShadows:false,falloffMode:pc.LIGHTFALLOFF_INVERSESQUARED});now.addChild(l);l.enabled=false;nightPool.push(l)}
+const moonMaterial=mat('moon','#edf1ff');moonMaterial.useLighting=false;moonMaterial.emissive=new pc.Color(.55,.65,.9);moonMaterial.update();const moon=primitive(shared,'sphere',moonMaterial,-700,1200,-1900,35,35,35);moon.enabled=false;
+const stars=new pc.Entity('night-stars');shared.addChild(stars);stars.enabled=false;
+const starMaterial=mat('starlight','#e6eeff');starMaterial.useLighting=false;starMaterial.emissive.set(.75,.83,1);starMaterial.update();
+let starSeed=991;const starRand=()=>{starSeed=(1664525*starSeed+1013904223)>>>0;return starSeed/4294967296};
+for(let i=0;i<180;i++){const az=starRand()*Math.PI*2,elev=.18+starRand()*1.18,r=2600,size=1.7+starRand()*2.3;box(stars,starMaterial,Math.cos(az)*Math.cos(elev)*r,Math.sin(elev)*r,Math.sin(az)*Math.cos(elev)*r,size,size,size)}
+
+const nightOriginalEmissive=new Map();for(const m of Object.values(mats))nightOriginalEmissive.set(m,m.emissive.clone());
+function applyLighting(){const night=isNight;daylightButton.textContent=night?'빛: 밤':'빛: 한낮';daylightButton.setAttribute('aria-pressed',night);document.body.classList.toggle('night',night);sun.light.color=night?new pc.Color(.42,.53,.85):new pc.Color(1,.96,.87);sun.light.intensity=night?(era==='now'?.48:.29):1.5;sun.setEulerAngles(night?32:52,night?145:-35,0);app.scene.ambientLight=night?(era==='now'?new pc.Color(.24,.29,.39):new pc.Color(.13,.17,.25)):new pc.Color(.54,.59,.63);app.scene.exposure=night?1.06:1.03;const sky=night?(era==='now'?new pc.Color(.045,.067,.12):new pc.Color(.025,.041,.085)):new pc.Color(.69,.78,.81);camera.camera.clearColor=sky;app.scene.fog.color=sky;app.scene.fog.start=night?700:1300;app.scene.fog.end=night?3200:4600;moon.enabled=night;stars.enabled=night;for(const [m,e]of nightOriginalEmissive){m.emissive.copy(night?pc.Color.BLACK:e);m.update()}lampGlow.emissive.set(night?2:0,night?1.5:0,night?.6:0);lampGlow.update();shopGlow.emissive.set(night?.6:0,night?.35:0,night?.13:0);shopGlow.update();moonMaterial.emissive.set(.55,.65,.9);moonMaterial.update();starMaterial.emissive.set(.75,.83,1);starMaterial.update();updateNightLights()}
+function updateNightLights(){const active=isNight&&era==='now';let nearby=active?[...lampPositions].sort((a,b)=>Math.hypot(a.x-desired.x,a.z-desired.z)-Math.hypot(b.x-desired.x,b.z-desired.z)):[];nightPool.forEach((l,i)=>{l.enabled=active&&i<nearby.length;if(l.enabled){const p=nearby[i];l.setPosition(p.x,p.y,p.z);l.light.intensity=p.shop?5:4.5;l.light.range=p.shop?25:30}})}
+
+for(const p of lampPositions){const bulb=primitive(now,'box',lampGlow,p.x,p.y+.12,p.z,.55,.065,.23);bulb.render.castShadows=false}
 // Compile meshes once. Each era stays in memory for instant camera-preserving switching.
 for(const b of buckets.values()){const mesh=new pc.Mesh(device);mesh.setPositions(b.p);mesh.setNormals(b.n);mesh.setUvs(0,b.u);mesh.setIndices(b.i);mesh.update(pc.PRIMITIVE_TRIANGLES);const ent=new pc.Entity(b.material.name);ent.addComponent('render',{meshInstances:[new pc.MeshInstance(mesh,b.material)],castShadows:!['water','ripple','grass','paddy','contactAO','pavers','concrete','soil','asphalt','lines'].includes(b.material.name),receiveShadows:true});b.parent.addChild(ent)}buckets.clear();
-let era='now',showLabels=true;let yaw=25,pitch=43,distance=285,target=new pc.Vec3(...school.point(0,0,32));let desired={yaw,pitch,distance,x:target.x,z:target.z};
+let era='now',showLabels=true;let firstPerson=false,isNight=false,runToggle=false;const walker={y:0,vy:0,grounded:true,step:0};let yaw=25,pitch=43,distance=285,target=new pc.Vec3(...school.point(0,0,32));let desired={yaw,pitch,distance,x:target.x,z:target.z};
 function toast(s){$('toast').textContent=s;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',2300)}
-function setEra(e){setTeleportArmed(false);closeSpeech();era=e;now.enabled=e==='now';old.enabled=e==='old';$('past').classList.toggle('active',e==='old');$('present').classList.toggle('active',e==='now');$('past').setAttribute('aria-pressed',e==='old');$('present').setAttribute('aria-pressed',e==='now');$('eraTitle').textContent=e==='old'?'황새가 찾아오던 한새벌':'오늘날의 우리 동네';$('eraText').innerHTML=e==='old'?'논과 들, 물이 고인 습지와<br>초가가 모여 있는 옛날의 풍경':'학교와 대학, 집과 도로가<br>모여 있는 오늘날의 풍경'}
+function setEra(e){closeSpeech();era=e;now.enabled=e==='now';old.enabled=e==='old';$('past').classList.toggle('active',e==='old');$('present').classList.toggle('active',e==='now');$('past').setAttribute('aria-pressed',e==='old');$('present').setAttribute('aria-pressed',e==='now');$('eraTitle').textContent=e==='old'?'황새가 찾아오던 한새벌':'오늘날의 우리 동네';$('eraText').innerHTML=e==='old'?'논과 들, 물이 고인 습지와<br>초가가 모여 있는 옛날의 풍경':'학교와 대학, 집과 도로가<br>모여 있는 오늘날의 풍경';applyLighting();walker.y=walkHeight(desired.x,desired.z);walker.vy=0}
 $('past').onclick=()=>setEra('old');$('present').onclick=()=>setEra('now');const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));function zoom(f){desired.distance=clamp(desired.distance*f,8,2700)}$('zoomIn').onclick=()=>zoom(.78);$('zoomOut').onclick=()=>zoom(1.28);$('home').onclick=()=>Object.assign(desired,{yaw:0,pitch:53,distance:990,x:0,z:65});$('school').onclick=()=>{Object.assign(desired,{x:school.point(0,0,46)[0],z:school.point(0,0,46)[2],distance:240,pitch:43,yaw:25});toast(era==='old'?'지금 우리 학교가 있는 자리입니다':'우리 학교를 가까이 살펴보세요')};$('top').onclick=()=>{desired.pitch=85;desired.yaw=0};$('names').onclick=()=>{showLabels=!showLabels;$('names').textContent=showLabels?'설명 숨김':'설명 보기';$('names').setAttribute('aria-pressed',showLabels)};$('full').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch(e){toast('전체 화면은 F11 키로도 볼 수 있습니다')}};
 let selectedPerson=null,meetingIndex={now:0,old:0};
 function closeSpeech(){selectedPerson=null;$('speech').hidden=true}
-function openSpeech(p){selectedPerson=p;p.line=0;$('speaker').textContent=p.name;$('speechText').textContent=p.talk[0];$('speech').hidden=false;Object.assign(desired,{x:p.entity.getPosition().x,z:p.entity.getPosition().z,distance:32,pitch:18,yaw:p.era==='now'?schoolAngle:p.angle+155});}
+function openSpeech(p){selectedPerson=p;p.line=0;$('speaker').textContent=p.name;$('speechText').textContent=p.talk[0];$('speech').hidden=false;if(firstPerson){document.exitPointerLock?.();return}Object.assign(desired,{x:p.entity.getPosition().x,z:p.entity.getPosition().z,distance:32,pitch:18,yaw:p.era==='now'?schoolAngle:p.angle+155});}
 $('speechClose').onclick=closeSpeech;$('speechNext').onclick=()=>{if(!selectedPerson)return;selectedPerson.line=(selectedPerson.line+1)%selectedPerson.talk.length;$('speechText').textContent=selectedPerson.talk[selectedPerson.line]};
 $('meetPeople').onclick=()=>{const list=people.filter(p=>p.era===era);openSpeech(list[meetingIndex[era]%list.length]);meetingIndex[era]++};
 $('magpies').onclick=()=>{closeSpeech();if(era!=='now')setEra('now');const p=school.point(0,0,28);Object.assign(desired,{x:p[0],z:p[2],distance:36,pitch:30,yaw:0})};
@@ -594,12 +713,12 @@ $('compare').onclick=()=>$('comparison').showModal();$('closeCompare').onclick=(
 function animatePeople(dt,time){for(let p of people){if(p.era!==era)continue;const t=time+p.phase;const walk=p.activity==='walk',play=p.activity==='play',wave=p.activity==='wave',farm=p.activity==='farm';let step=p.activity==='wade'?Math.sin(t*.7)*8:walk?Math.sin(t*3.3)*22:play?Math.sin(t*3)*12:0;for(let i=0;i<2;i++){p.legs[i].setLocalEulerAngles((i?1:-1)*step,0,0);p.arms[i].setLocalEulerAngles((i?-1:1)*step,0,wave&&i===1?125+Math.sin(t*3)*13:(i?1:-1)*(play?35+Math.sin(t*2)*18:7))}if(p.activity==='wade')p.entity.setPosition(p.x+Math.sin(t*.35)*.12,-.1,p.z+Math.cos(t*.35)*.12);if(walk){p.entity.setPosition(p.x+Math.sin(t*.45)*1.2,0,p.z+Math.cos(t*.45)*.9)}p.group.setLocalEulerAngles(farm?13+Math.sin(t*1.8)*10:0,0,0);p.group.setLocalPosition(0,play?Math.abs(Math.sin(t*2))*.07:0,0)}if(era==='now')ballRoot.setPosition(ballPoint[0]+Math.sin(time*1.3)*1.1,.1+Math.abs(Math.sin(time*2.6))*.45,ballPoint[2])}
 const personScreen=new pc.Vec3();
 function updatePeoplePins(){const cw=canvas.clientWidth||innerWidth,ch=canvas.clientHeight||innerHeight;for(let p of people){let pos=p.entity.getPosition();p.pos.set(pos.x,pos.y+p.height+.3,pos.z);camera.camera.worldToScreen(p.pos,personScreen);let active=p.era===era&&personScreen.z>0&&personScreen.x>5&&personScreen.x<cw-85&&personScreen.y>150&&personScreen.y<ch-110; // Filter distant clusters to keep the aerial view readable.
-if(distance>350){const preferred=era==='now'?[0,5,6,7]:[8,9,13];active=active&&preferred.includes(people.indexOf(p))}if(active){p.pin.style.display='block';p.pin.style.left=personScreen.x+'px';p.pin.style.top=personScreen.y+'px'}else p.pin.style.display='none'}}
+if(!firstPerson&&distance>350){const preferred=era==='now'?[0,5,6,7]:[8,9,13];active=active&&preferred.includes(people.indexOf(p))}if(active){p.pin.style.display='block';p.pin.style.left=personScreen.x+'px';p.pin.style.top=personScreen.y+'px'}else p.pin.style.display='none'}}
 // Direct body clicking supplements the explicit speech markers; drags never trigger speech.
 let tapStart=null;canvas.addEventListener('pointerdown',e=>{if(e.button===0)tapStart={x:e.clientX,y:e.clientY,id:e.pointerId}});canvas.addEventListener('pointerup',e=>{if(!tapStart||tapStart.id!==e.pointerId||Math.hypot(e.clientX-tapStart.x,e.clientY-tapStart.y)>5){tapStart=null;return}tapStart=null;if(pointers.size>1)return;let nearest=null,best=24;for(let p of people){if(p.era!==era||p.pin.style.display==='none')continue;const pos=p.entity.getPosition();camera.camera.worldToScreen(new pc.Vec3(pos.x,pos.y+p.height*.6,pos.z),personScreen);const d=Math.hypot(personScreen.x-e.clientX,personScreen.y-e.clientY);if(personScreen.z>0&&d<best){nearest=p;best=d}}if(nearest)openSpeech(nearest)});canvas.addEventListener('pointercancel',()=>tapStart=null);
 
 const pointers=new Map();let pinch=0;canvas.oncontextmenu=e=>e.preventDefault();canvas.addEventListener('pointerdown',e=>{canvas.focus();canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,button:e.button});pinch=0});function pan(dx,dy){let a=desired.yaw*Math.PI/180,s=desired.distance*.0011;desired.x=clamp(desired.x+(-dx*Math.cos(a)+dy*Math.sin(a))*s,-1500,1500);desired.z=clamp(desired.z+(dx*Math.sin(a)+dy*Math.cos(a))*s,-1350,1450)}
-canvas.addEventListener('pointermove',e=>{let prev=pointers.get(e.pointerId);if(!prev)return;const dx=e.clientX-prev.x,dy=e.clientY-prev.y;let panMode=prev.button===2||e.shiftKey;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,button:prev.button});if(pointers.size===2){let [a,b]=[...pointers.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch>0)zoom(pinch/Math.max(d,1));pinch=d;pan(dx*.5,dy*.5)}else if(panMode)pan(dx,dy);else{desired.yaw-=dx*.25;desired.pitch=clamp(desired.pitch+dy*.19,9,85)}});for(const ev of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(ev,e=>{pointers.delete(e.pointerId);pinch=0});canvas.addEventListener('wheel',e=>{e.preventDefault();zoom(Math.exp(clamp(e.deltaY,-180,180)*.0015))},{passive:false});const heldKeys=new Set();
+canvas.addEventListener('pointermove',e=>{let prev=pointers.get(e.pointerId);if(!prev)return;const dx=e.clientX-prev.x,dy=e.clientY-prev.y;if(firstPerson){desired.yaw-=dx*.2;desired.pitch=clamp(desired.pitch+dy*.16,-80,80);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,button:prev.button});return}let panMode=prev.button===2||e.shiftKey;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,button:prev.button});if(pointers.size===2){let [a,b]=[...pointers.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch>0)zoom(pinch/Math.max(d,1));pinch=d;pan(dx*.5,dy*.5)}else if(panMode)pan(dx,dy);else{desired.yaw-=dx*.25;desired.pitch=clamp(desired.pitch+dy*.19,9,85)}});for(const ev of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(ev,e=>{pointers.delete(e.pointerId);pinch=0});canvas.addEventListener('wheel',e=>{e.preventDefault();zoom(Math.exp(clamp(e.deltaY,-180,180)*.0015))},{passive:false});const heldKeys=new Set();
 const touchKeys=new Set();function setTouchVisible(show){$('touchMove').classList.toggle('shown',show);document.body.classList.toggle('touchControls',show);$('touchToggle').setAttribute('aria-pressed',show);if(!show)touchKeys.clear()}
 setTouchVisible(window.matchMedia('(pointer: coarse), (max-width: 1200px)').matches);
 $('touchToggle').onclick=()=>setTouchVisible(!$('touchMove').classList.contains('shown'));
@@ -608,61 +727,96 @@ window.addEventListener('blur',()=>touchKeys.clear());document.addEventListener(
 $('well').onclick=()=>{closeSpeech();Object.assign(desired,{x:wellX,z:wellZ,distance:era==='old'?68:15,pitch:era==='old'?43:27,yaw:0})};
 $('dyke').onclick=()=>{closeSpeech();if(era!=='old')setEra('old');Object.assign(desired,{x:dykeX,z:dykeZ,distance:45,pitch:30,yaw:75})};
 
-const moveCodes=['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyQ','KeyE','ShiftLeft','ShiftRight'];
-window.addEventListener('keydown',e=>{if(document.querySelector('dialog[open]')||/INPUT|TEXTAREA|SELECT/.test(e.target?.tagName||''))return;if(moveCodes.includes(e.code)){e.preventDefault();heldKeys.add(e.code)}if(e.code==='Equal'||e.code==='NumpadAdd'){e.preventDefault();zoom(.9)}if(e.code==='Minus'||e.code==='NumpadSubtract'){e.preventDefault();zoom(1.1)}});
+const moveCodes=['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyQ','KeyE','ShiftLeft','ShiftRight','Space','KeyF'];
+window.addEventListener('keydown',e=>{if(document.querySelector('dialog[open]')||/INPUT|TEXTAREA|SELECT/.test(e.target?.tagName||''))return;if(e.code==='Space'&&!e.repeat){e.preventDefault();jump()}if(e.code==='KeyF'&&!e.repeat)talkNearby();if(moveCodes.includes(e.code)){e.preventDefault();heldKeys.add(e.code)}if(e.code==='Equal'||e.code==='NumpadAdd'){e.preventDefault();zoom(.9)}if(e.code==='Minus'||e.code==='NumpadSubtract'){e.preventDefault();zoom(1.1)}});
 window.addEventListener('keyup',e=>heldKeys.delete(e.code));window.addEventListener('blur',()=>heldKeys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)heldKeys.clear()});
-function keyboardMove(dt){if(document.querySelector('dialog[open]')){heldKeys.clear();touchKeys.clear();return}const down=(...keys)=>keys.some(k=>heldKeys.has(k)||touchKeys.has(k));let forward=Number(down('KeyW','ArrowUp'))-Number(down('KeyS','ArrowDown')),right=Number(down('KeyD','ArrowRight'))-Number(down('KeyA','ArrowLeft'));const len=Math.hypot(forward,right)||1;const speed=clamp(desired.distance*.22,8,150)*(down('ShiftLeft','ShiftRight')?2:1)*Math.min(dt,.05);let angle=desired.yaw*Math.PI/180;if(forward||right){desired.x=clamp(desired.x+(-Math.sin(angle)*forward+Math.cos(angle)*right)/len*speed,-1500,1500);desired.z=clamp(desired.z+(-Math.cos(angle)*forward-Math.sin(angle)*right)/len*speed,-1350,1450)}desired.yaw+=(Number(down('KeyQ'))-Number(down('KeyE')))*60*Math.min(dt,.05)}
+function orbitKeyboardMove(dt){if(document.querySelector('dialog[open]')){heldKeys.clear();touchKeys.clear();return}const down=(...keys)=>keys.some(k=>heldKeys.has(k)||touchKeys.has(k));let forward=Number(down('KeyW','ArrowUp'))-Number(down('KeyS','ArrowDown')),right=Number(down('KeyD','ArrowRight'))-Number(down('KeyA','ArrowLeft'));const len=Math.hypot(forward,right)||1;const speed=clamp(desired.distance*.22,8,150)*(down('ShiftLeft','ShiftRight')?2:1)*Math.min(dt,.05);let angle=desired.yaw*Math.PI/180;if(forward||right){desired.x=clamp(desired.x+(-Math.sin(angle)*forward+Math.cos(angle)*right)/len*speed,-1500,1500);desired.z=clamp(desired.z+(-Math.cos(angle)*forward-Math.sin(angle)*right)/len*speed,-1350,1450)}desired.yaw+=(Number(down('KeyQ'))-Number(down('KeyE')))*60*Math.min(dt,.05)}
 
 let teleportArmed=false;
-const teleportGesture=teleportSupport.createGesture(),teleportPointers=new Set();
+const teleportGesture=teleportSupport.createGesture(),teleportPointers=new Set(),teleportDrag=new Map();let teleportPinch=0;
 function setTeleportArmed(active){
- teleportArmed=active;teleportGesture.reset();
+ teleportArmed=active;teleportGesture.reset();teleportDrag.clear();teleportPinch=0;
  for(const id of teleportPointers){if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}teleportPointers.clear();
- document.body.classList.toggle('teleport-mode',active);$('teleport').setAttribute('aria-pressed',String(active));$('teleport').textContent=active?'이동 취소':'순간 이동';
- if(active){for(const id of pointers.keys()){if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}pointers.clear();pinch=0;tapStart=null;heldKeys.clear();touchKeys.clear();closeSpeech();toast('이동할 바닥을 클릭하거나 터치하세요. Esc 키로 취소할 수 있어요.')}
+ document.body.classList.toggle('teleport-mode',active);$('teleport').setAttribute('aria-pressed',String(active));$('teleport').textContent=active?'순간 이동: 켜짐':'순간 이동';
+ if(active){document.exitPointerLock?.();for(const id of pointers.keys()){if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}pointers.clear();pinch=0;tapStart=null;heldKeys.clear();touchKeys.clear();closeSpeech();toast('짧게 누르면 이동, 드래그하면 둘러보기. Esc 또는 버튼으로 끌 수 있어요.')}
 }
 function teleportToScreen(clientX,clientY){
  const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return false;
  const pixelX=(clientX-rect.left)*device.clientRect.width/rect.width,pixelY=(clientY-rect.top)*device.clientRect.height/rect.height;
  const origin=camera.getPosition().clone(),rayPoint=camera.camera.screenToWorld(pixelX,pixelY,1,new pc.Vec3()),direction=rayPoint.sub(origin).normalize();
- const hit=teleportSupport.pickGround(origin,direction,(x,z)=>Math.max(0,hillHeight(x,z)),camera.camera.farClip);
- if(!hit){toast('이동할 수 있는 바닥을 선택해 주세요.');return false}
+ const hit=teleportSupport.pickGround(origin,direction,(x,z)=>walkHeight(x,z),camera.camera.farClip);
+ if(!hit){toast('이동할 수 있는 바닥을 선택해 주세요.');return false}if(firstPerson){const y=walker.y;walker.y=walkHeight(hit.x,hit.z);const solid=blocked(hit.x,hit.z);walker.y=y;if(solid){toast('건물 밖의 길이나 운동장을 골라 주세요.');return false}}
  // Commit both the displayed and desired state, bypassing camera easing for this one action.
- closeSpeech();heldKeys.clear();touchKeys.clear();desired.x=hit.x;desired.z=hit.z;desired.yaw=yaw;desired.pitch=pitch;desired.distance=distance;
+ closeSpeech();heldKeys.clear();touchKeys.clear();desired.x=hit.x;desired.z=hit.z;if(!firstPerson){desired.yaw=yaw;desired.pitch=pitch;desired.distance=distance;}
  target.x=hit.x;target.y=hit.y;target.z=hit.z;
  const a=yaw*Math.PI/180,b=pitch*Math.PI/180;camera.setPosition(target.x+distance*Math.cos(b)*Math.sin(a),target.y+distance*Math.sin(b),target.z+distance*Math.cos(b)*Math.cos(a));camera.lookAt(target);
- setTeleportArmed(false);toast('선택한 곳으로 이동했어요.');return true;
+ if(firstPerson){walker.y=walkHeight(hit.x,hit.z);walker.vy=0;walker.grounded=true;placeFirstPerson()}toast('이동했어요. 다른 바닥을 누르면 또 이동해요.');return true;
 }
 $('teleport').onclick=()=>setTeleportArmed(!teleportArmed);
-// Capture before ordinary rotation and person-click handlers; one tap produces one move.
+// A tap teleports; a mouse or touch drag rotates without disarming teleport.
 canvas.addEventListener('pointerdown',e=>{
  if(!teleportArmed)return;e.preventDefault();e.stopImmediatePropagation();
- if(e.button!==0){setTeleportArmed(false);return}
- canvas.focus();teleportPointers.add(e.pointerId);teleportGesture.down(e.pointerId,e.clientX,e.clientY);canvas.setPointerCapture(e.pointerId);
+ if(e.button!==0&&e.button!==2)return;
+ canvas.focus();teleportPointers.add(e.pointerId);teleportGesture.down(e.pointerId,e.clientX,e.clientY);teleportDrag.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,dragging:e.button===2,button:e.button});teleportPinch=0;canvas.setPointerCapture(e.pointerId);
 },{capture:true,passive:false});
-canvas.addEventListener('pointermove',e=>{if(!teleportArmed)return;e.preventDefault();e.stopImmediatePropagation();teleportGesture.move(e.pointerId,e.clientX,e.clientY);},{capture:true,passive:false});
+canvas.addEventListener('pointermove',e=>{
+ if(!teleportArmed)return;const p=teleportDrag.get(e.pointerId);if(!p)return;e.preventDefault();e.stopImmediatePropagation();teleportGesture.move(e.pointerId,e.clientX,e.clientY);
+ if(!p.dragging&&Math.hypot(e.clientX-p.sx,e.clientY-p.sy)>8)p.dragging=true;
+ const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+ if(teleportDrag.size===2){const [a,b]=[...teleportDrag.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(teleportPinch>0&&!firstPerson)zoom(teleportPinch/Math.max(d,1));teleportPinch=d;return}
+ if(p.dragging){desired.yaw-=dx*(firstPerson?.2:.25);desired.pitch=clamp(desired.pitch+dy*(firstPerson?.16:.19),firstPerson?-80:9,firstPerson?80:85)}
+},{capture:true,passive:false});
 canvas.addEventListener('pointerup',e=>{
- if(!teleportArmed)return;e.preventDefault();e.stopImmediatePropagation();
- const valid=teleportGesture.up(e.pointerId,e.clientX,e.clientY);teleportPointers.delete(e.pointerId);
+ if(!teleportArmed)return;e.preventDefault();e.stopImmediatePropagation();const p=teleportDrag.get(e.pointerId);
+ const valid=teleportGesture.up(e.pointerId,e.clientX,e.clientY)&&p&&!p.dragging&&p.button===0;teleportDrag.delete(e.pointerId);teleportPointers.delete(e.pointerId);teleportPinch=0;
  if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);
  if(valid)teleportToScreen(e.clientX,e.clientY);
 },{capture:true,passive:false});
-for(const event of ['pointercancel','lostpointercapture'])canvas.addEventListener(event,e=>{if(!teleportArmed)return;teleportGesture.cancel(e.pointerId);teleportPointers.delete(e.pointerId);e.stopImmediatePropagation();},{capture:true});
+for(const event of ['pointercancel','lostpointercapture'])canvas.addEventListener(event,e=>{if(!teleportArmed)return;teleportGesture.cancel(e.pointerId);teleportPointers.delete(e.pointerId);teleportDrag.delete(e.pointerId);teleportPinch=0;e.stopImmediatePropagation();},{capture:true});
 window.addEventListener('keydown',e=>{if(teleportArmed&&e.code==='Escape'){setTeleportArmed(false);e.preventDefault()}});
 window.addEventListener('blur',()=>setTeleportArmed(false));
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setTeleportArmed(false)});
 
-const screen=new pc.Vec3();let lastLabels=0;let animationTime=0;app.on('update',dt=>{keyboardMove(dt);animationTime+=dt;animatePeople(dt,animationTime);animateMagpies(animationTime);animateWell(animationTime);let f=1-Math.exp(-dt*10);yaw+=(desired.yaw-yaw)*f;pitch+=(desired.pitch-pitch)*f;distance+=(desired.distance-distance)*f;target.x+=(desired.x-target.x)*f;target.z+=(desired.z-target.z)*f;target.y+=(Math.max(0,hillHeight(target.x,target.z))-target.y)*f;const a=yaw*Math.PI/180,b=pitch*Math.PI/180;camera.setPosition(target.x+distance*Math.cos(b)*Math.sin(a),target.y+distance*Math.sin(b),target.z+distance*Math.cos(b)*Math.cos(a));camera.lookAt(target);$('north').style.transform=`rotate(${-yaw}deg)`;lastLabels+=dt;if(lastLabels>.05){lastLabels=0;updatePeoplePins();const occupied=[];for(let l of [...labels].sort((a,b)=>a.pos.distance(target)-b.pos.distance(target))){camera.camera.worldToScreen(l.pos,screen);const width=Math.min(260,l.el.textContent.length*12+20);let visible=showLabels&&l.era===era&&screen.z>0&&screen.x>width/2+12&&screen.x<innerWidth-width/2-110&&screen.y>190&&screen.y<innerHeight-140&&!occupied.some(r=>Math.abs(r.x-screen.x)<(r.w+width)/2+6&&Math.abs(r.y-screen.y)<36);l.el.style.display=visible?'block':'none';if(visible){occupied.push({x:screen.x,y:screen.y,w:width});l.el.style.left=screen.x+'px';l.el.style.top=screen.y+'px'}}}});
+// Kinematic first person walking uses the same terrain in both eras.
+function schoolLocal(x,z){const a=schoolAngle*Math.PI/180,dx=x-schoolOrigin.x,dz=z-schoolOrigin.z;return {x:dx*Math.cos(a)-dz*Math.sin(a),z:dx*Math.sin(a)+dz*Math.cos(a)}}
+function walkHeight(x,z){let h=Math.max(0,hillHeight(x,z));if(era==='now'){h=Math.max(h,.42);const p=schoolLocal(x,z);if(p.x>=-13.5&&p.x<=16.3&&p.z>=87.45&&p.z<=93.82){const k=Math.max(0,Math.min(10,Math.floor((p.z-87.49)/.57)));h=Math.max(h,.5+k*.28)}if(p.x>=-13.5&&p.x<=16.3&&p.z>93.4&&p.z<104)h=Math.max(h,3.3)}else if(x>-354&&x<-316&&z>-91&&z<-60)h=Math.max(h,.64);return h}
+function blocked(x,z){for(const b of solidBoxes){if(b.era!=='both'&&b.era!==era)continue;if(walker.y+1.55<b.y-b.h/2||walker.y+.28>b.y+b.h/2)continue;const a=b.angle*Math.PI/180,dx=x-b.x,dz=z-b.z,lx=dx*Math.cos(a)-dz*Math.sin(a),lz=dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(lx)<b.w/2+.25&&Math.abs(lz)<b.d/2+.25)return true}return false}
+function keyboardMove(dt){if(!firstPerson){orbitKeyboardMove(dt);return}if(document.querySelector('dialog[open]')){heldKeys.clear();touchKeys.clear();return}dt=Math.min(dt,.05);const down=(...keys)=>keys.some(k=>heldKeys.has(k)||touchKeys.has(k)),forward=Number(down('KeyW','ArrowUp'))-Number(down('KeyS','ArrowDown')),right=Number(down('KeyD','ArrowRight'))-Number(down('KeyA','ArrowLeft')),len=Math.hypot(forward,right)||1,speed=(down('ShiftLeft','ShiftRight')||runToggle?8.5:4.3)*dt,a=desired.yaw*Math.PI/180,dx=(-Math.sin(a)*forward+Math.cos(a)*right)*speed/len,dz=(-Math.cos(a)*forward-Math.sin(a)*right)*speed/len;
+ function axis(x,z){const g=walkHeight(x,z);if(g-walker.y>.36||blocked(x,z))return false;desired.x=x;desired.z=z;return true}
+ if(forward||right){axis(clamp(desired.x+dx,-1500,1500),desired.z);axis(desired.x,clamp(desired.z+dz,-1350,1450));walker.step+=dt*(speed/dt)}
+ desired.yaw+=(Number(down('KeyQ'))-Number(down('KeyE')))*80*dt;
+ const floor=walkHeight(desired.x,desired.z);walker.vy-=20*dt;walker.y+=walker.vy*dt;if(walker.y<=floor){walker.y=floor;walker.vy=0;walker.grounded=true}else walker.grounded=false;
+}
+function jump(){if(firstPerson&&walker.grounded&&!document.querySelector('dialog[open]')){walker.vy=7.2;walker.grounded=false}}
+function placeFirstPerson(){const a=desired.yaw*Math.PI/180,b=desired.pitch*Math.PI/180;const bob=walker.grounded&&[...heldKeys,...touchKeys].some(k=>['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(k))?Math.sin(walker.step*2)*.025:0;camera.setPosition(desired.x,walker.y+1.58+bob,desired.z);camera.lookAt(desired.x-Math.sin(a)*Math.cos(b),walker.y+1.58+bob-Math.sin(b),desired.z-Math.cos(a)*Math.cos(b));target.set(desired.x,walker.y,desired.z)}
+function setFirstPerson(value){firstPerson=value;heldKeys.clear();touchKeys.clear();runToggle=false;$('runButton').setAttribute('aria-pressed','false');document.body.classList.toggle('first-person',value);$('firstPerson').textContent=value?'시점: 1인칭':'시점: 둘러보기';$('firstPerson').setAttribute('aria-pressed',value);camera.camera.nearClip=value?.06:.5;camera.camera.fov=value?65:46;desired.pitch=value?0:38;if(value){walker.y=walkHeight(desired.x,desired.z);walker.vy=0;walker.grounded=true;if(blocked(desired.x,desired.z)){let found=false;for(let r=2;r<50&&!found;r+=2)for(let j=0;j<16;j++){const x=desired.x+Math.cos(j*Math.PI/8)*r,z=desired.z+Math.sin(j*Math.PI/8)*r;if(!blocked(x,z)){desired.x=x;desired.z=z;walker.y=walkHeight(x,z);found=true;break}}}placeFirstPerson();toast('WASD 이동 · Shift 달리기 · Space 점프 · F 대화. 화면을 드래그해 둘러보세요.')}else{document.exitPointerLock?.();desired.distance=65}}
+function talkNearby(){const origin=camera.getPosition();let nearest=null,best=7;for(const p of people){if(p.era!==era)continue;const d=p.entity.getPosition().distance(origin);if(d<best){best=d;nearest=p}}if(nearest)openSpeech(nearest);else toast('사람에게 조금 더 가까이 다가가 보세요.')}
+$('firstPerson').onclick=()=>setFirstPerson(!firstPerson);
+$('jumpButton').addEventListener('pointerdown',e=>{e.preventDefault();jump()});
+$('runButton').onclick=()=>{runToggle=!runToggle;$('runButton').setAttribute('aria-pressed',runToggle)};
+$('talkButton').onclick=talkNearby;
+$('lookButton').onclick=()=>{if(!firstPerson)setFirstPerson(true);setTeleportArmed(false);try{const p=canvas.requestPointerLock?.();p?.catch(()=>toast('화면을 드래그해서 둘러볼 수 있어요.'))}catch{toast('화면을 드래그해서 둘러볼 수 있어요.')}};
+document.addEventListener('mousemove',e=>{if(firstPerson&&document.pointerLockElement===canvas){desired.yaw-=e.movementX*.16;desired.pitch=clamp(desired.pitch+e.movementY*.14,-80,80)}});
+canvas.addEventListener('pointerup',e=>{if(firstPerson&&document.pointerLockElement===canvas&&e.button===0)talkNearby()});
+window.addEventListener('blur',()=>{runToggle=false;$('runButton').setAttribute('aria-pressed','false')});
+// Existing fly-to viewpoints retain their overview behaviour; walking stops explicitly enter first person.
+for(const id of ['home','school','top','college','magpies','well','dyke'])$(id).addEventListener('click',()=>{if(firstPerson)setFirstPerson(false)},true);
+const activities=document.createElement('select');activities.id='activityVisit';activities.setAttribute('aria-label','체험할 장소');activities.innerHTML='<option value="">걸어서 체험하기</option><option value="entrance">정문에서 거리 보기</option><option value="stairs">벽화와 오른쪽 계단 보기</option><option value="bamboo">대나무숲 길 걷기</option><option value="dure">두레와 김매기</option><option value="games">옛날 어린이 놀이</option>';
+document.querySelector('.meet').append(activities);
+activities.onchange=()=>{const key=activities.value;if(!key)return;let p,heading;if(key==='entrance'){setEra('now');p=gateStreet.point(0,0,6);heading=262}else if(key==='stairs'){setEra('now');p=school.point(6,0,83);heading=schoolAngle+180}else if(key==='bamboo'){setEra('now');p=[...schoolPath[0]];p=[p[0],0,p[1]];heading=Math.atan2(p[0]-schoolPath[1][0],p[2]-schoolPath[1][1])*180/Math.PI}else if(key==='dure'){setEra('old');p=[-326,0,-59];heading=0}else{setEra('old');p=[playCentre.x+3,0,playCentre.z+25];heading=0}desired.x=p[0];desired.z=p[2];desired.yaw=heading;setFirstPerson(true);activities.value=''};
+
+const screen=new pc.Vec3();let lastLabels=0;let animationTime=0;app.on('update',dt=>{keyboardMove(dt);animationTime+=dt;animatePeople(dt,animationTime);animateMagpies(animationTime);animateWell(animationTime);animateVillage(animationTime);updateNightLights();let f=1-Math.exp(-dt*10);yaw+=(desired.yaw-yaw)*f;pitch+=(desired.pitch-pitch)*f;distance+=(desired.distance-distance)*f;target.x+=(desired.x-target.x)*f;target.z+=(desired.z-target.z)*f;target.y+=(Math.max(0,hillHeight(target.x,target.z))-target.y)*f;const a=yaw*Math.PI/180,b=pitch*Math.PI/180;camera.setPosition(target.x+distance*Math.cos(b)*Math.sin(a),target.y+distance*Math.sin(b),target.z+distance*Math.cos(b)*Math.cos(a));camera.lookAt(target);if(firstPerson)placeFirstPerson();$('north').style.transform=`rotate(${-yaw}deg)`;lastLabels+=dt;if(lastLabels>.05){lastLabels=0;updatePeoplePins();const occupied=[];for(let l of [...labels].sort((a,b)=>a.pos.distance(target)-b.pos.distance(target))){camera.camera.worldToScreen(l.pos,screen);const width=Math.min(260,l.el.textContent.length*12+20);let visible=showLabels&&l.era===era&&screen.z>0&&screen.x>width/2+12&&screen.x<innerWidth-width/2-110&&screen.y>190&&screen.y<innerHeight-140&&!occupied.some(r=>Math.abs(r.x-screen.x)<(r.w+width)/2+6&&Math.abs(r.y-screen.y)<36);l.el.style.display=visible?'block':'none';if(visible){occupied.push({x:screen.x,y:screen.y,w:width});l.el.style.left=screen.x+'px';l.el.style.top=screen.y+'px'}}}});
 // Useful fixed views make individual buildings inspectable on a touch screen.
 const buildingStops=[['학교 앞쪽',school,0,6,110,43],['벽화 쪽',gaenari,0,10,75,133],['파란 건물 쪽',parang,0,10,85,133],['학교 뒤쪽',kkachi,0,21,82,133],['옆 건물 쪽',songjuk,0,10,80,-47],['잔디 마당',school,0,39,160,25],['모래 마당',school,-2,74,110,43]];
-const visit=document.createElement('select');visit.id='buildingVisit';visit.setAttribute('aria-label','건물 가까이 보기');visit.innerHTML='<option value="">건물 가까이 보기</option>'+buildingStops.map((v,i)=>`<option value="${i}">${v[0]}</option>`).join('');document.querySelector('.meet').append(visit);visit.onchange=()=>{if(visit.value==='')return;closeSpeech();setEra('now');const [name,f,x,z,d,y]=buildingStops[Number(visit.value)],p=f.point(x,0,z);Object.assign(desired,{x:p[0],z:p[2],distance:d,pitch:25,yaw:y});visit.value='';toast(name+' 외관을 살펴보세요')};
+const visit=document.createElement('select');visit.id='buildingVisit';visit.setAttribute('aria-label','건물 가까이 보기');visit.innerHTML='<option value="">건물 가까이 보기</option>'+buildingStops.map((v,i)=>`<option value="${i}">${v[0]}</option>`).join('');document.querySelector('.meet').append(visit);visit.onchange=()=>{if(visit.value==='')return;if(firstPerson)setFirstPerson(false);closeSpeech();setEra('now');const [name,f,x,z,d,y]=buildingStops[Number(visit.value)],p=f.point(x,0,z);Object.assign(desired,{x:p[0],z:p[2],distance:d,pitch:25,yaw:y});visit.value='';toast(name+' 외관을 살펴보세요')};
 const cityButton=document.createElement('button');cityButton.textContent='도시 전경';cityButton.onclick=()=>{closeSpeech();Object.assign(desired,{x:X(625),z:Z(630),distance:600,pitch:48,yaw:20})};document.querySelector('.tools').insertBefore(cityButton,$('school'));
-const daylightButton=document.createElement('button');daylightButton.textContent='빛: 한낮';let evening=false;daylightButton.onclick=()=>{evening=!evening;daylightButton.textContent=evening?'빛: 늦은 오후':'빛: 한낮';sun.light.color=evening?new pc.Color(1,.77,.54):new pc.Color(1,.96,.87);sun.light.intensity=evening?1.65:1.5;sun.setEulerAngles(evening?29:52,-35,0);app.scene.ambientLight=evening?new pc.Color(.42,.46,.53):new pc.Color(.54,.59,.63)};document.querySelector('.tools').append(daylightButton);
+const daylightButton=document.createElement('button');daylightButton.id='dayNight';daylightButton.textContent='빛: 한낮';daylightButton.onclick=()=>{isNight=!isNight;applyLighting()};document.querySelector('.tools').append(daylightButton);
+
 const qualityButton=document.createElement('button');let fine=innerWidth>1200&&!matchMedia('(pointer: coarse)').matches;function quality(){device.maxPixelRatio=Math.min(devicePixelRatio,fine?1.8:1.25);sun.light.shadowResolution=fine?4096:2048;app.resizeCanvas();qualityButton.textContent=fine?'화질: 정밀':'화질: 기본'}qualityButton.onclick=()=>{fine=!fine;quality()};document.querySelector('.tools').append(qualityButton);quality();
 
-const nearby=document.createElement('select');nearby.id='nearbyVisit';nearby.setAttribute('aria-label','동네 둘러보기');nearby.innerHTML='<option value="">동네 둘러보기</option><option value="hill">언덕</option><option value="station">역 주변</option><option value="stream">하천</option>';document.querySelector('.meet').append(nearby);nearby.onchange=()=>{const key=nearby.value;if(!key)return;closeSpeech();if(key!=='hill')setEra('now');const p=contextSites[key];Object.assign(desired,{x:p.x,z:p.z,distance:key==='hill'?410:key==='neighbourhood'?280:key==='stream'?380:320,pitch:46,yaw:20});nearby.value=''};
-cityButton.onclick=()=>{closeSpeech();Object.assign(desired,{x:180,z:220,distance:1300,pitch:58,yaw:43})};
+const nearby=document.createElement('select');nearby.id='nearbyVisit';nearby.setAttribute('aria-label','동네 둘러보기');nearby.innerHTML='<option value="">동네 둘러보기</option><option value="hill">언덕</option><option value="station">역 주변</option><option value="stream">하천</option>';document.querySelector('.meet').append(nearby);nearby.onchange=()=>{if(firstPerson)setFirstPerson(false);const key=nearby.value;if(!key)return;closeSpeech();if(key!=='hill')setEra('now');const p=contextSites[key];Object.assign(desired,{x:p.x,z:p.z,distance:key==='hill'?410:key==='neighbourhood'?280:key==='stream'?380:320,pitch:46,yaw:20});nearby.value=''};
+cityButton.onclick=()=>{if(firstPerson)setFirstPerson(false);closeSpeech();Object.assign(desired,{x:180,z:220,distance:1300,pitch:58,yaw:43})};
 
-const campusVisit=document.createElement('select');campusVisit.id='campusVisit';campusVisit.setAttribute('aria-label','대학과 길 자세히 보기');campusVisit.innerHTML='<option value="">대학과 길 자세히 보기</option>'+Object.entries(detailStops).map(([key,p])=>`<option value="${key}">${p.name}</option>`).join('');document.querySelector('.meet').append(campusVisit);campusVisit.onchange=()=>{const stop=detailStops[campusVisit.value];if(!stop)return;closeSpeech();setEra('now');Object.assign(desired,stop);campusVisit.value='';toast(stop.name+'을 살펴보세요')};
-app.start();$('loading').classList.add('hidden');window.timeTravel={app,setEra,getState:()=>({era,device:device.deviceType,desired:{...desired},meshes:now.children.length+old.children.length,people:people.length,terrainShared:shared.enabled!==false,schoolLayout:{yard:yardSpec,kkachiFacing:schoolAngle+90,main:school.point(0,0,0),kkachi:kp,parang:bp,songjuk:sp,playground:school.point(0,0,43)},graphicsRevision:'well-homes-and-teleport-r5',teleportArmed,wellHuts,mapAnchors,riverRoute,trainees:trainees.length,universityBuildings,detailStops,campusRoute,textOrientation:'bottom-up RGBA with outward-only faces',contextSites,characterStyle:'block',magpies:magpies.length,wellLocation:{x:wellX,z:wellZ},dykeLocation:{x:dykeX,z:dykeZ},textureUpload:'ImageBitmap'})};
+const campusVisit=document.createElement('select');campusVisit.id='campusVisit';campusVisit.setAttribute('aria-label','대학과 길 자세히 보기');campusVisit.innerHTML='<option value="">대학과 길 자세히 보기</option>'+Object.entries(detailStops).map(([key,p])=>`<option value="${key}">${p.name}</option>`).join('');document.querySelector('.meet').append(campusVisit);campusVisit.onchange=()=>{if(firstPerson)setFirstPerson(false);const stop=detailStops[campusVisit.value];if(!stop)return;closeSpeech();setEra('now');Object.assign(desired,stop);campusVisit.value='';toast(stop.name+'을 살펴보세요')};
+app.start();$('loading').classList.add('hidden');window.timeTravel={app,setEra,setFirstPerson,teleportToScreen,setTeleportArmed,jump,walkHeight,visit:(x,z)=>{desired.x=x;desired.z=z;walker.y=walkHeight(x,z);walker.vy=0},getState:()=>({era,device:device.deviceType,desired:{...desired},meshes:now.children.length+old.children.length,people:people.length,terrainShared:shared.enabled!==false,schoolLayout:{yard:yardSpec,kkachiFacing:schoolAngle+90,main:school.point(0,0,0),kkachi:kp,parang:bp,songjuk:sp,playground:school.point(0,0,43)},graphicsRevision:'photo-corrections-and-drag-r7',nightAmbient:app.scene.ambientLight.toString(),crestSource:'user-photo',songjukFacade:'blue-orange-yellow-green',starCount:180,vegetationRevision:'pine-branch-needles-and-bamboo-lance-leaves',firstPerson,isNight,walker:{...walker},nightLights:lampPositions.length,dureWorkers:dureWorkers.length,schoolPath,muralWall:school.point(23,0,94),terraceStairBounds:{minX:-13.5,maxX:16.3},playCentre,teleportArmed,wellHuts,mapAnchors,riverRoute,trainees:trainees.length,universityBuildings,detailStops,campusRoute,textOrientation:'bottom-up RGBA with outward-only faces',contextSites,characterStyle:'block',magpies:magpies.length,wellLocation:{x:wellX,z:wellZ},dykeLocation:{x:dykeX,z:dykeZ},textureUpload:'ImageBitmap'})};
 }

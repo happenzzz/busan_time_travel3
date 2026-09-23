@@ -23,3 +23,19 @@ header h1{word-break:keep-all;font-size:clamp(16px,2.1vw,22px)}
 #teleport[aria-pressed="true"]{background:#155c4d;color:#fff;box-shadow:0 0 0 3px #86bca7}
 .teleport-mode #view{cursor:crosshair}
 .teleport-mode #labels,.teleport-mode #labels .personPin{pointer-events:none}
+
+/* Walking controls remain reachable on a landscape smart pad. */
+.tools{max-height:calc(100dvh - 105px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+#walkActions{display:none;position:absolute;right:185px;bottom:24px;padding:8px;gap:6px;z-index:12;touch-action:none}
+.first-person #walkActions{display:flex}.first-person .caption{display:none}
+#walkActions button{min-height:48px;touch-action:none;font-size:14px;padding:10px 13px}
+#runButton[aria-pressed=true],#firstPerson[aria-pressed=true]{background:#175b4c;color:#fff}
+#reticle{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font:22px monospace;pointer-events:none;text-shadow:0 1px 3px #000}
+.first-person #reticle{display:block}.teleport-mode #reticle{display:none}
+#activityVisit{font:700 13px 'Malgun Gothic',sans-serif;padding:8px;border:1px solid #b7cec4;border-radius:9px;color:#204c40;background:#f5fbf8;max-width:175px}
+.night .panel{background:#142230ed;color:#e5ebf0;border-color:#516478}.night h1,.night .subtitle,.night .caption p{color:#e4ebf4}.night .help{background:#101826dd}
+@media(max-height:700px){#walkActions{right:150px;bottom:18px;max-width:225px;flex-wrap:wrap}#walkActions button{font-size:13px;min-height:42px;padding:7px 11px}.meet{max-height:110px;overflow-y:auto;max-width:calc(100% - 165px)}.help{display:none}.first-person #speech{bottom:95px;max-height:calc(100dvh - 210px);overflow:auto}}
+@media(pointer:coarse){#lookButton{display:none}}
+@media(max-width:650px){#walkActions{right:12px;bottom:110px;max-width:115px;flex-wrap:wrap}.first-person #walkActions button{flex:1}.meet{max-height:118px;overflow-y:auto}#activityVisit{font-size:11px;max-width:145px}.first-person #speech{bottom:240px;max-height:calc(100dvh - 420px);overflow:auto}}
+
+@media(min-width:651px){#walkActions{right:18px;bottom:112px;max-width:300px;flex-wrap:wrap;justify-content:flex-end}#walkActions button{min-height:44px}.first-person .help{bottom:185px}}
