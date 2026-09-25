@@ -41,3 +41,12 @@ header h1{word-break:keep-all;font-size:clamp(16px,2.1vw,22px)}
 @media(min-width:651px){#walkActions{right:18px;bottom:112px;max-width:300px;flex-wrap:wrap;justify-content:flex-end}#walkActions button{min-height:44px}.first-person .help{bottom:185px}}
 
 .sceneTabs{display:flex;flex-basis:100%;gap:5px;padding-bottom:5px;border-bottom:1px solid #bfcfc4;flex-wrap:wrap}.sceneTabs button{background:#e8f0e9;border:1px solid #b6cbbc}.sceneTabs button.active{background:#175b4c;color:#fff}#photoVisit{font:700 13px "Malgun Gothic",sans-serif;padding:8px;border:1px solid #b7cec4;border-radius:9px;color:#204c40;background:#f5fbf8;max-width:170px}@media(max-height:700px){.meet{max-height:150px}.sceneTabs button{font-size:12px;min-height:36px}}@media(max-width:650px){.meet{max-height:155px}.sceneTabs{gap:3px}.sceneTabs button{font-size:11px;padding:6px}#photoVisit{font-size:11px;max-width:145px}}
+
+/* Comic speech bubbles above people (textbook-style). */
+.bubble{position:absolute;pointer-events:auto;transform:translate(-50%,calc(-100% - 10px));background:#fffdf8;color:#2a2a2a;border:2px solid #9aa7a2;border-radius:18px;padding:7px 13px;font:700 14px/1.45 "Malgun Gothic",sans-serif;min-height:0;max-width:210px;width:max-content;text-align:center;word-break:keep-all;box-shadow:0 3px 10px #0003;z-index:4;cursor:pointer}
+.bubble:hover{background:#fff4d9}
+.bubble:after{content:"";position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);border-top:10px solid #9aa7a2;border-left:7px solid transparent;border-right:7px solid transparent}
+.bubble:before{content:"";position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);border-top:8px solid #fffdf8;border-left:5px solid transparent;border-right:5px solid transparent;z-index:1}
+.bubble.hot{border-color:#e8703e}.bubble.hot:after{border-top-color:#e8703e}
+.teleport-mode #labels .bubble{pointer-events:none}
+@media(max-width:650px){.bubble{font-size:12px;max-width:160px;padding:5px 9px}}
